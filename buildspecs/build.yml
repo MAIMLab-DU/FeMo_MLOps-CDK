@@ -1,0 +1,22 @@
+version: 0.2
+
+env:
+  variables:
+    nodeversion: 18
+    pythonversion: 3.10
+
+phases:
+  install:
+    runtime-versions:
+      python: $pythonversion
+      nodejs: $nodeversion
+
+  build:
+    commands:
+      - bash scripts/ci.sh
+      - bash scripts/copy_data_manifest.sh
+      - bash scripts/build_deploy.sh
+
+artifacts:
+  files:
+    - '**/*'
