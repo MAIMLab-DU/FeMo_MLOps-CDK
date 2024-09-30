@@ -1,0 +1,18 @@
+{
+  "name": "@aws-prototype/model-consumer-online-data-api",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT-0",
+  "dependencies": {
+    "@aws-prototype/model-consumer-online-data-type": "1.0.0",
+    "@aws-sdk/client-s3": "^3.651.0",
+    "@aws-sdk/client-sagemaker-runtime": "^3.0.0",  
+    "@aws-sdk/client-dynamodb": "^3.0.0",         
+    "@aws-sdk/util-dynamodb": "^3.0.0"        
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint --max-warnings 0  .",
+    "lint:fix": "eslint --fix ."
+  }
+}
