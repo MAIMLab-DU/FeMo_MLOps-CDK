@@ -6,10 +6,10 @@
 - [ ] lib/codePipelineConstruct.ts
   - [ ] Modify as needed
 - [ ] lib/dataSourceConstruct.ts
-  - [ ] persistent data source bucket
+  - [x] persistent data source bucket
   - [ ] sns topic modify (if needed)
 - [ ] dataSourceMonitor
-  - [ ] Use python for lambda function
+  - [x] Use python for lambda function
   - [ ] modify lambda function
   - [ ] dataManifest.json structure
 - [ ] lib/infrastructureStack.ts

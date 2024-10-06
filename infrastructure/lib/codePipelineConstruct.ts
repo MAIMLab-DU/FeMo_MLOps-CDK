@@ -62,7 +62,7 @@ export class CodePipelineConstruct extends Construct {
             repo: props.gitML.githubRepoName,
             branch: props.gitML.githubRepoBranch || 'main',
             connectionArn: props.gitML.githubConnectionArn,
-            triggerOnPush: false
+            triggerOnPush: false,
         });
         const sourceCDKCode = new codepipeline_actions.CodeStarConnectionsSourceAction({
             actionName: 'SourceCDKCode',
@@ -71,7 +71,7 @@ export class CodePipelineConstruct extends Construct {
             repo: props.gitCDK.githubRepoName,
             branch: props.gitCDK.githubRepoBranch || 'main',
             connectionArn: props.gitCDK.githubConnectionArn,
-            triggerOnPush: false
+            triggerOnPush: false,
         });
 
         //Source Data
@@ -90,20 +90,24 @@ export class CodePipelineConstruct extends Construct {
             providerType: codepipeline.ProviderType.CODE_STAR_SOURCE_CONNECTION,
             gitConfiguration: {
                 sourceAction: sourceMLCode,
-                pushFilter: [{
-                    tagsExcludes: ['v0.*.*', 'v*.*.*-alpha'],
-                    tagsIncludes: ['v*.*.*'],
-                }],
+                pushFilter: [
+                    {
+                        tagsExcludes: ['v0.*.*', 'v*.*.*-alpha'],
+                        tagsIncludes: ['v*.*.*'],
+                    },
+                ],
             },
         });
         this.pipeline.addTrigger({
             providerType: codepipeline.ProviderType.CODE_STAR_SOURCE_CONNECTION,
             gitConfiguration: {
                 sourceAction: sourceCDKCode,
-                pushFilter: [{
-                    tagsExcludes: ['v0.*.*', 'v*.*.*-alpha'],
-                    tagsIncludes: ['v*.*.*'],
-                }],
+                pushFilter: [
+                    {
+                        tagsExcludes: ['v0.*.*', 'v*.*.*-alpha'],
+                        tagsIncludes: ['v*.*.*'],
+                    },
+                ],
             },
         });
 

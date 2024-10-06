@@ -9,6 +9,7 @@ const app = new App();
 new InfrastractureStack(app, `${projectConfig.projectName}-MLOpsInfraStack`, {
     projectName: projectConfig.projectName,
     repoType: 'git',
+    existingDataBucketName: projectConfig.dataBucketName,
     gitML: projectConfig.gitML,
     gitCDK: projectConfig.gitCDK,
 });

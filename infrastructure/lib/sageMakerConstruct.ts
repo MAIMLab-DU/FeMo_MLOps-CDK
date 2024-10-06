@@ -5,7 +5,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 
 export interface SageMakerConstructProps {
-    readonly dataBucket: s3.Bucket;
+    readonly dataBucket: s3.IBucket;
 }
 
 /**

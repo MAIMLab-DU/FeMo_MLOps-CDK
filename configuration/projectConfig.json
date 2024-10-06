@@ -1,6 +1,7 @@
 {
     "projectName": "FeMo",
     "repoType": "git",
+    "dataBucketName": "femo-sensor-logfiles",
     "gitML": {
         "githubConnectionArn": "",
         "githubRepoOwner": "",
