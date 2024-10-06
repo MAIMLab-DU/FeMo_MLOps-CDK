@@ -5,14 +5,13 @@ import { Construct } from 'constructs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as sns from 'aws-cdk-lib/aws-sns';
-import * as codecommit from 'aws-cdk-lib/aws-codecommit';
 import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as codepipeline from 'aws-cdk-lib/aws-codepipeline';
 import * as codepipeline_actions from 'aws-cdk-lib/aws-codepipeline-actions';
 
 export type CodePipelineConstructPropsBase = {
     readonly projectName: string;
-} & (CodePipelineConstructPropsGithubSource | CodePipelineConstructPropsCodeCommitSource);
+} & CodePipelineConstructPropsGithubSource;
 
 export type CodePipelineConstructProps = {
     readonly dataManifestBucket: s3.Bucket;
@@ -20,13 +19,15 @@ export type CodePipelineConstructProps = {
     readonly sageMakerExecutionRole: iam.Role;
 } & CodePipelineConstructPropsBase;
 
-export interface CodePipelineConstructPropsCodeCommitSource {
-    readonly repoType: 'codecommit';
-}
-
 export interface CodePipelineConstructPropsGithubSource {
     readonly repoType: 'git';
-    readonly git: {
+    readonly gitML: {
+        readonly githubConnectionArn: string;
+        readonly githubRepoOwner: string;
+        readonly githubRepoName: string;
+        readonly githubRepoBranch?: string;
+    };
+    readonly gitCDK: {
         readonly githubConnectionArn: string;
         readonly githubRepoOwner: string;
         readonly githubRepoName: string;
@@ -43,37 +44,35 @@ export class CodePipelineConstruct extends Construct {
         super(scope, id);
 
         this.pipeline = new codepipeline.Pipeline(this, 'MLOpsPipeline', {
+            pipelineType: codepipeline.PipelineType.V2,
             restartExecutionOnUpdate: true,
         });
 
-        const sourceCodeOutput = new codepipeline.Artifact('SourceCodeOutput');
+        const sourceMLCodeOutput = new codepipeline.Artifact('SourceMLCodeOutput');
+        const sourceCDKCodeOutput = new codepipeline.Artifact('SourceCDKCodeOutput');
         const sourceDataOutput = new codepipeline.Artifact('SourceDataOutput');
         const buildOutput = new codepipeline.Artifact('BuildOutput');
         const pipelineOutput = new codepipeline.Artifact('PipelineOutput');
 
-        let sourceCode: codepipeline_actions.Action;
-
         //Source Code
-        if (props.repoType === 'git') {
-            sourceCode = new codepipeline_actions.CodeStarConnectionsSourceAction({
-                actionName: 'SourceCode',
-                output: sourceCodeOutput,
-                owner: props.git.githubRepoOwner,
-                repo: props.git.githubRepoName,
-                branch: props.git.githubRepoBranch || 'main',
-                connectionArn: props.git.githubConnectionArn,
-            });
-        } else {
-            const sourceRepo = new codecommit.Repository(this, 'SourceRepository', {
-                repositoryName: 'MLOpsE2EDemo',
-            });
-            sourceCode = new codepipeline_actions.CodeCommitSourceAction({
-                actionName: 'SourceCode',
-                output: sourceCodeOutput,
-                repository: sourceRepo,
-                branch: 'main',
-            });
-        }
+        const sourceMLCode = new codepipeline_actions.CodeStarConnectionsSourceAction({
+            actionName: 'SourceMLCode',
+            output: sourceMLCodeOutput,
+            owner: props.gitML.githubRepoOwner,
+            repo: props.gitML.githubRepoName,
+            branch: props.gitML.githubRepoBranch || 'main',
+            connectionArn: props.gitML.githubConnectionArn,
+            triggerOnPush: false
+        });
+        const sourceCDKCode = new codepipeline_actions.CodeStarConnectionsSourceAction({
+            actionName: 'SourceCDKCode',
+            output: sourceCDKCodeOutput,
+            owner: props.gitCDK.githubRepoOwner,
+            repo: props.gitCDK.githubRepoName,
+            branch: props.gitCDK.githubRepoBranch || 'main',
+            connectionArn: props.gitCDK.githubConnectionArn,
+            triggerOnPush: false
+        });
 
         //Source Data
         const sourceData = new codepipeline_actions.S3SourceAction({
@@ -85,7 +84,27 @@ export class CodePipelineConstruct extends Construct {
 
         this.pipeline.addStage({
             stageName: 'Source',
-            actions: [sourceCode, sourceData],
+            actions: [sourceCDKCode, sourceMLCode, sourceData],
+        });
+        this.pipeline.addTrigger({
+            providerType: codepipeline.ProviderType.CODE_STAR_SOURCE_CONNECTION,
+            gitConfiguration: {
+                sourceAction: sourceMLCode,
+                pushFilter: [{
+                    tagsExcludes: ['v0.*.*', 'v*.*.*-alpha'],
+                    tagsIncludes: ['v*.*.*'],
+                }],
+            },
+        });
+        this.pipeline.addTrigger({
+            providerType: codepipeline.ProviderType.CODE_STAR_SOURCE_CONNECTION,
+            gitConfiguration: {
+                sourceAction: sourceCDKCode,
+                pushFilter: [{
+                    tagsExcludes: ['v0.*.*', 'v*.*.*-alpha'],
+                    tagsIncludes: ['v*.*.*'],
+                }],
+            },
         });
 
         //CI
@@ -100,7 +119,7 @@ export class CodePipelineConstruct extends Construct {
         const build = new codepipeline_actions.CodeBuildAction({
             actionName: 'CIBuild',
             project: buildProject,
-            input: sourceCodeOutput,
+            input: sourceMLCodeOutput,
             extraInputs: [sourceDataOutput],
             outputs: [buildOutput],
         });

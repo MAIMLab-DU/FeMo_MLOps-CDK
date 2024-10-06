@@ -1,7 +1,12 @@
 {
-    "projectName": "mlops-e2e",
+    "projectName": "FeMo",
     "repoType": "git",
-    "git": {
+    "gitML": {
+        "githubConnectionArn": "",
+        "githubRepoOwner": "",
+        "githubRepoName": ""
+    },
+    "gitCDK": {
         "githubConnectionArn": "",
         "githubRepoOwner": "",
         "githubRepoName": ""

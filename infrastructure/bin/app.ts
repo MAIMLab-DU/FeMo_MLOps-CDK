@@ -6,8 +6,9 @@ import { InfrastractureStack } from '../lib/infrastractureStack';
 import projectConfig = require('../../configuration/projectConfig.json');
 
 const app = new App();
-new InfrastractureStack(app, `MLOpsInfrastractureStack-${projectConfig.projectName}`, {
+new InfrastractureStack(app, `${projectConfig.projectName}-MLOpsInfraStack`, {
     projectName: projectConfig.projectName,
-    repoType: projectConfig.repoType === 'git' ? 'git' : 'codecommit',
-    git: projectConfig.git,
+    repoType: 'git',
+    gitML: projectConfig.gitML,
+    gitCDK: projectConfig.gitCDK,
 });

@@ -1,26 +1,37 @@
 # Infrastructure
 
--[ ] bin/app.ts
-    -[ ] project name change
-    -[ ] git only
--[ ] dataSourceMonitor
-    -[ ] modify lambda function
-    -[ ] dataManifest.json structure
--[ ] lib/dataSourceConstruct.ts
-    -[ ] persistent data source bucket
-    -[ ] sns topic modify (if needed)
--[ ] lib/codePipelineConstruct.ts
-    -[ ] Approval stage before ML-Pipeline
--[ ] lib/infrastructureStack.ts
-    -[ ] modify output (if needed)
+- [x] bin/app.ts
+    - [x] project name change
+- [x] Add two source actions for code - sourceCDKCode, sourceMLCode
+- [ ] dataSourceMonitor
+    - [ ] Use python for lambda function
+    - [ ] modify lambda function
+    - [ ] dataManifest.json structure
+- [ ] lib/dataSourceConstruct.ts
+    - [ ] persistent data source bucket
+    - [ ] sns topic modify (if needed)
+- [ ] lib/codePipelineConstruct.ts
+    - [ ] Approval stage before ML-Pipeline
+- [ ] lib/infrastructureStack.ts
+    - [ ] modify output (if needed)
+  
+
+# Model Deploy
+- [ ] piplineModelFunction
+  - [ ] Use python for lambda function
+  - [ ] Modify lambda function
 
 
 # Consumers
 
 **Infrastructure, frontend and backend code for inference interface**
 
--[ ] Modify packages/data-api
--[ ] Modify packages/data-type
--[ ] Modify packages/webiste
--[ ] Modify packages/webiste-index-builder
--[ ] Modify packages/infrastructure
+- [ ] Modify packages/data-api
+- [ ] Modify packages/data-type
+- [ ] Modify packages/webiste
+- [ ] Modify packages/webiste-index-builder
+- [ ] Modify packages/infrastructure
+
+# README
+
+Update documentation

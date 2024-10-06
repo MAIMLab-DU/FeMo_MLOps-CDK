@@ -27,25 +27,27 @@ export class InfrastractureStack extends Stack {
 
         new CfnOutput(this, 'CodePipelineOutput', {
             value: codePipeline.pipeline.pipelineName,
+            exportName: 'FeMo-CodePipeline',
         });
 
         new CfnOutput(this, 'DataBucketOutput', {
             value: dataSource.dataBucket.bucketName,
-            exportName: 'MLOpsE2EDemo-DataBucket',
+            exportName: 'FeMo-DataBucket',
         });
 
         new CfnOutput(this, 'DataManifestBucketOutput', {
             value: dataSource.dataManifestBucket.bucketName,
+            exportName: 'FeMo-DataManifestBucket',
         });
 
         new CfnOutput(this, 'SageMakerArtifactBucketOutput', {
             value: sageMaker.sagemakerArtifactBucket.bucketName,
-            exportName: 'MLOpsE2EDemo-SageMakerArtifactBucket',
+            exportName: 'FeMo-SageMakerArtifactBucket',
         });
 
         new CfnOutput(this, 'SageMakerExecutionRoleOutput', {
             value: sageMaker.sagemakerExecutionRole.roleArn,
-            exportName: 'MLOpsE2EDemo-SageMakerExecutionRole',
+            exportName: 'FeMo-SageMakerExecutionRole',
         });
     }
 }
