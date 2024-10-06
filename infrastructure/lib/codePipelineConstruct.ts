@@ -119,8 +119,8 @@ export class CodePipelineConstruct extends Construct {
         const build = new codepipeline_actions.CodeBuildAction({
             actionName: 'CIBuild',
             project: buildProject,
-            input: sourceMLCodeOutput,
-            extraInputs: [sourceDataOutput],
+            input: sourceCDKCodeOutput,
+            extraInputs: [sourceMLCodeOutput, sourceDataOutput],
             outputs: [buildOutput],
         });
 

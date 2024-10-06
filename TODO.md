@@ -1,19 +1,19 @@
 # Infrastructure
 
 - [x] bin/app.ts
-    - [x] project name change
+  - [x] project name change
 - [x] Add two source actions for code - sourceCDKCode, sourceMLCode
-- [ ] dataSourceMonitor
-    - [ ] Use python for lambda function
-    - [ ] modify lambda function
-    - [ ] dataManifest.json structure
-- [ ] lib/dataSourceConstruct.ts
-    - [ ] persistent data source bucket
-    - [ ] sns topic modify (if needed)
 - [ ] lib/codePipelineConstruct.ts
-    - [ ] Approval stage before ML-Pipeline
+  - [ ] Modify as needed
+- [ ] lib/dataSourceConstruct.ts
+  - [ ] persistent data source bucket
+  - [ ] sns topic modify (if needed)
+- [ ] dataSourceMonitor
+  - [ ] Use python for lambda function
+  - [ ] modify lambda function
+  - [ ] dataManifest.json structure
 - [ ] lib/infrastructureStack.ts
-    - [ ] modify output (if needed)
+  - [ ] modify output (if needed)
   
 
 # Model Deploy
