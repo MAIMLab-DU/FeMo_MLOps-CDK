@@ -7,5 +7,5 @@ set -e
 echo "Data Manifest:"
 cat ${CODEBUILD_SRC_DIR_SourceDataOutput}/manifest.json
 
-echo "Copying Data Manifest to main folder"
-cat ${CODEBUILD_SRC_DIR_SourceDataOutput}/manifest.json > ./dataManifest.json
+echo "Copying Data Manifest to ML Pipeline Source folder"
+cat ${CODEBUILD_SRC_DIR_SourceDataOutput}/manifest.json > ${CODEBUILD_SRC_DIR_SourceMLCodeOutput}/configs/dataManifest.json
