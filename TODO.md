@@ -5,13 +5,15 @@
 - [x] Add two source actions for code - sourceCDKCode, sourceMLCode
 - [ ] lib/codePipelineConstruct.ts
   - [ ] Modify as needed
-- [ ] lib/dataSourceConstruct.ts
-  - [ ] persistent data source bucket
-  - [ ] sns topic modify (if needed)
+- [x] lib/dataSourceConstruct.ts
+  - [x] persistent data source bucket
+  - [x] cloudwatch even trigger instead of sns
 - [ ] dataSourceMonitor
-  - [ ] Use python for lambda function
+  - [x] Use python for lambda function
   - [ ] modify lambda function
-  - [ ] dataManifest.json structure
+    - [ ] belt type MAC address wise
+    - [ ] manual triggering support
+  - [x] dataManifest.json structure
 - [ ] lib/infrastructureStack.ts
   - [ ] modify output (if needed)
   

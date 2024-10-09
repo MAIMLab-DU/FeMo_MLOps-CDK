@@ -3,16 +3,18 @@
 import { Stack, StackProps, CfnOutput } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { CodePipelineConstruct, CodePipelineConstructPropsBase } from './codePipelineConstruct';
-import { DataSourceConstruct } from './dataSourceConstruct';
+import { DataSourceConstruct, DataSourceConstructProps } from './dataSourceConstruct';
 import { SageMakerConstruct } from './sageMakerConstruct';
 
-export type InfrastractureStackProps = CodePipelineConstructPropsBase & StackProps;
+export type InfrastractureStackProps = CodePipelineConstructPropsBase & StackProps & DataSourceConstructProps;
 
 export class InfrastractureStack extends Stack {
     constructor(scope: Construct, id: string, props: InfrastractureStackProps) {
         super(scope, id, props);
 
-        const dataSource = new DataSourceConstruct(this, 'DataSource');
+        const dataSource = new DataSourceConstruct(this, 'DataSource', {
+            ...props,
+        });
 
         const sageMaker = new SageMakerConstruct(this, 'SageMakerConstruct', {
             dataBucket: dataSource.dataBucket,
