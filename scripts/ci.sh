@@ -4,16 +4,14 @@ set -e
 
 # TODO: proper ci script
 
-# bash ./scripts/test.sh
-
 pushd ./infrastructure
 
 pushd ./functions/dataSourceMonitor
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-pip install pylint
-pylint *.py
+pip install ruff==0.6.4
+ruff check *.py
 deactivate
 popd
 
@@ -23,6 +21,7 @@ yarn build
 yarn cdk synth
 popd
 
+## TODO: for model deploy
 # pushd ./model_deploy
 
 # pushd ./customResources/pipelineModel
@@ -36,6 +35,7 @@ popd
 # yarn cdk synth
 # popd
 
+## TODO: for model consumer
 # pushd ./consumers/online
 
 # pushd ./packages/data-api

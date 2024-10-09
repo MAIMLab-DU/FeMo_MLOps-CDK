@@ -79,7 +79,7 @@ export class CodePipelineConstruct extends Construct {
             actionName: 'SourceData',
             output: sourceDataOutput,
             bucket: props.dataManifestBucket,
-            bucketKey: 'manifest.json.zip',
+            bucketKey: 'manifest.json',
         });
 
         this.pipeline.addStage({
