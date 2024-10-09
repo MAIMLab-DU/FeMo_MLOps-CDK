@@ -11,6 +11,7 @@ DATA_BUCKET_NAME = os.environ.get('DATA_BUCKET_NAME', '')
 MANIFEST_BUCKET_NAME = os.environ.get('DATA_MANIFEST_BUCKET_NAME', '')
 MIN_DIFF = int(os.environ.get('MIN_DIFF', 1))
 
+
 def list_all_objects(bucket_name):
     """List all objects in the specified S3 bucket, handle pagination."""
     all_objects = []
@@ -24,7 +25,8 @@ def list_all_objects(bucket_name):
                 response = s3_client.list_objects_v2(Bucket=bucket_name)
 
             objects = response.get('Contents', [])
-            all_objects.extend([{'bucketName': bucket_name, 'objectKey': obj['Key']} for obj in objects if obj['Key'].endswith('.dat')])
+            all_objects.extend([{'bucketName': bucket_name, 'datFileKey': obj['Key'], 'csvFileKey': obj['Key'].replace('.dat', '.csv')}
+                                for obj in objects if obj['Key'].endswith('.dat')])
 
             if response.get('IsTruncated'):
                 continuation_token = response['NextContinuationToken']

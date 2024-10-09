@@ -66,7 +66,7 @@ export class DataSourceConstruct extends Construct {
             runtime: lambda.Runtime.PYTHON_3_10, // Use Python 3.10 runtime
             handler: 'index.handler', // Python handler defined as 'filename.function_name'
             code: lambda.Code.fromAsset(path.join(__dirname, '../functions/dataSourceMonitor')), // Path to Python code
-            timeout: Duration.minutes(1),
+            timeout: Duration.minutes(5),
             role: dataSourceMonitorFunctionRole,
             environment: {
                 DATA_BUCKET_NAME: this.dataBucket.bucketName,
