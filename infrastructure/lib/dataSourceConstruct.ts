@@ -5,16 +5,17 @@ import { Construct } from 'constructs';
 import { Duration } from 'aws-cdk-lib';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as sns from 'aws-cdk-lib/aws-sns';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as s3Notification from 'aws-cdk-lib/aws-s3-notifications';
-import * as snsSubscription from 'aws-cdk-lib/aws-sns-subscriptions';
 
 /**
  * The CDK Construct provisions the data source buckets and related resources.
  */
 export interface DataSourceConstructProps {
     existingDataBucketName?: string;
+    triggerPeriod: number;
+    minNumberOfFiles: number;
 }
 
 export class DataSourceConstruct extends Construct {
@@ -55,8 +56,10 @@ export class DataSourceConstruct extends Construct {
         this.dataManifestBucket.grantWrite(dataSourceMonitorFunctionRole);
 
         // Set up SNS Topic for new data
-        const newDataTopic = new sns.Topic(this, 'NewDataTopic');
-        this.dataBucket.addObjectCreatedNotification(new s3Notification.SnsDestination(newDataTopic));
+        // Set up a CloudWatch Event Rule to trigger the Lambda function once a day
+        const rule = new events.Rule(this, 'PeriodicTrigger', {
+            schedule: events.Schedule.rate(Duration.days(props.triggerPeriod))  // Trigger Lambda once a day
+        });
 
         // Lambda function to monitor the bucket - using Python 3.10 runtime
         const dataMonitorFunction = new lambda.Function(this, 'DataSourceMonitorFunction', {
@@ -66,11 +69,14 @@ export class DataSourceConstruct extends Construct {
             timeout: Duration.minutes(1),
             role: dataSourceMonitorFunctionRole,
             environment: {
+                DATA_BUCKET_NAME: this.dataBucket.bucketName,
                 DATA_MANIFEST_BUCKET_NAME: this.dataManifestBucket.bucketName,
+                MIN_DIFF: props.minNumberOfFiles.toString(),
             },
         });
 
-        // Subscribe the Lambda function to the SNS Topic
-        newDataTopic.addSubscription(new snsSubscription.LambdaSubscription(dataMonitorFunction));
+        // Add the Lambda function as the target of the CloudWatch event
+        rule.addTarget(new targets.LambdaFunction(dataMonitorFunction));
+
     }
 }
