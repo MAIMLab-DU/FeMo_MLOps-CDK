@@ -52,20 +52,21 @@ export class DataSourceConstruct extends Construct {
             versioned: true,
             publicReadAccess: false,
         });
-
+        this.dataManifestBucket.grantRead(dataSourceMonitorFunctionRole);
         this.dataManifestBucket.grantWrite(dataSourceMonitorFunctionRole);
 
-        // Set up SNS Topic for new data
         // Set up a CloudWatch Event Rule to trigger the Lambda function periodically
         const rule = new events.Rule(this, 'PeriodicTrigger', {
             schedule: events.Schedule.rate(Duration.days(props.triggerPeriod)),
         });
 
-        // Lambda function to monitor the bucket - using Python 3.10 runtime
+        // Lambda function to monitor the bucket
         const dataMonitorFunction = new lambda.Function(this, 'DataSourceMonitorFunction', {
             runtime: lambda.Runtime.PYTHON_3_10, // Use Python 3.10 runtime
             handler: 'index.handler', // Python handler defined as 'filename.function_name'
-            code: lambda.Code.fromAsset(path.join(__dirname, '../functions/dataSourceMonitor')), // Path to Python code
+            code: lambda.Code.fromAsset(path.join(__dirname, '../functions/dataSourceMonitor'), {
+                exclude: ['.venv', '.ruff_cache', '.pytest_cache', '*.pyc', '__pycache__'],
+            }),
             timeout: Duration.minutes(5),
             role: dataSourceMonitorFunctionRole,
             environment: {
