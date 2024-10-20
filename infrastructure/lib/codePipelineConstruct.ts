@@ -52,7 +52,8 @@ export class CodePipelineConstruct extends Construct {
         const sourceMLCodeOutput = new codepipeline.Artifact('SourceMLCodeOutput');
         const sourceCDKCodeOutput = new codepipeline.Artifact('SourceCDKCodeOutput');
         const sourceDataOutput = new codepipeline.Artifact('SourceDataOutput');
-        const buildOutput = new codepipeline.Artifact('BuildOutput');
+        const buildOutputCDK = new codepipeline.Artifact('BuildOutputCDK');
+        const buildOutputML = new codepipeline.Artifact('BuildOutputML');
         const pipelineOutput = new codepipeline.Artifact('PipelineOutput');
 
         //Source Code
@@ -119,10 +120,6 @@ export class CodePipelineConstruct extends Construct {
                 buildImage: codebuild.LinuxBuildImage.STANDARD_6_0,
                 privileged: true,
             },
-            environmentVariables: {
-                S3_BUCKET: { value: props.ciBucketName, },
-                AWS_DEFAULT_REGION: { value: Stack.of(this).region },
-            }
         });
         buildProject.addToRolePolicy(new iam.PolicyStatement({
             actions: ['ssm:GetParameters', 'ssm:GetParameter', 'ssm:GetParameterHistory'],
@@ -134,7 +131,17 @@ export class CodePipelineConstruct extends Construct {
             project: buildProject,
             input: sourceCDKCodeOutput,
             extraInputs: [sourceMLCodeOutput, sourceDataOutput],
-            outputs: [buildOutput],
+            outputs: [buildOutputCDK, buildOutputML],
+            environmentVariables: {
+                S3_BUCKET: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: props.ciBucketName,
+                },
+                AWS_DEFAULT_REGION: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: Stack.of(this).region,
+                },
+            }
         });
 
         this.pipeline.addStage({
@@ -198,7 +205,8 @@ export class CodePipelineConstruct extends Construct {
         const mlPipelie = new codepipeline_actions.CodeBuildAction({
             actionName: 'MLPipeline',
             project: mlPipelineProject,
-            input: buildOutput,
+            input: buildOutputCDK,
+            extraInputs: [buildOutputML],
             outputs: [pipelineOutput],
             environmentVariables: {
                 SAGEMAKER_ARTIFACT_BUCKET: {
@@ -338,7 +346,7 @@ export class CodePipelineConstruct extends Construct {
             actionName: 'Deploy',
             runOrder: 2,
             project: deployProject,
-            input: buildOutput,
+            input: buildOutputCDK,
             extraInputs: [pipelineOutput],
         });
 
