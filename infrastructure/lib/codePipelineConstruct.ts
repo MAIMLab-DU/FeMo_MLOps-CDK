@@ -133,7 +133,7 @@ export class CodePipelineConstruct extends Construct {
             extraInputs: [sourceMLCodeOutput, sourceDataOutput],
             outputs: [buildOutputCDK, buildOutputML],
             environmentVariables: {
-                S3_BUCKET: {
+                S3_CIBUCKET: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: props.ciBucketName,
                 },

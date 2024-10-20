@@ -26,11 +26,11 @@ aws configure set default.region $AWS_DEFAULT_REGION
 # If upload flag is set, upload the $S3_KEY file to S3
 if [ "$UPLOAD_FLAG" = true ]; then
     echo "Uploading '$S3_KEY' to S3..."
-    aws s3 cp $S3_KEY s3://$S3_BUCKET/$S3_KEY
+    aws s3 cp $S3_KEY s3://$S3_CIBUCKET/$S3_KEY
 fi
 
 echo "Downloading '$S3_KEY' from S3..."
-aws s3 cp s3://$S3_BUCKET/$S3_KEY $S3_KEY
+aws s3 cp s3://$S3_CIBUCKET/$S3_KEY $S3_KEY
 
 pushd ./infrastructure
 
