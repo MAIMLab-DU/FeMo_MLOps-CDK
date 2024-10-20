@@ -1,3 +1,4 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 import * as path from 'path';
 import { Construct } from 'constructs';
@@ -53,7 +54,7 @@ export class DataSourceConstruct extends Construct {
         });
         this.dataManifestBucket.grantRead(dataSourceMonitorFunctionRole);
         this.dataManifestBucket.grantWrite(dataSourceMonitorFunctionRole);
-        
+
         // Set up a CloudWatch Event Rule to trigger the Lambda function periodically
         const rule = new events.Rule(this, 'PeriodicTrigger', {
             schedule: events.Schedule.rate(Duration.days(props.triggerPeriod)),
