@@ -58,7 +58,7 @@ export class DataSourceConstruct extends Construct {
         // Set up SNS Topic for new data
         // Set up a CloudWatch Event Rule to trigger the Lambda function periodically
         const rule = new events.Rule(this, 'PeriodicTrigger', {
-            schedule: events.Schedule.rate(Duration.days(props.triggerPeriod))
+            schedule: events.Schedule.rate(Duration.days(props.triggerPeriod)),
         });
 
         // Lambda function to monitor the bucket - using Python 3.10 runtime
@@ -77,6 +77,5 @@ export class DataSourceConstruct extends Construct {
 
         // Add the Lambda function as the target of the CloudWatch event
         rule.addTarget(new targets.LambdaFunction(dataMonitorFunction));
-
     }
 }

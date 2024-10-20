@@ -1,7 +1,8 @@
 {
     "projectName": "FeMo",
     "repoType": "git",
-    "dataBucketName": "femo-sensor-logfiles",
+    "dataBucketName": "",
+    "ciBucketName": "",
     "triggerPeriod": 1,
     "minNumberofFiles": 2,
     "gitML": {
