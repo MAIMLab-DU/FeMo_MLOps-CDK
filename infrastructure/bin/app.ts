@@ -5,9 +5,10 @@ import { App } from 'aws-cdk-lib';
 import { InfrastractureStack } from '../lib/infrastractureStack';
 import projectConfig = require('../../configuration/projectConfig.json');
 
-const desc: string = "CloudFormation template used for provisioning all the necessary resources for the MLOps insfrastructure, " + 
-"for Fetal Movement Analysis project. Resources include: S3 buckets, Lambda functions, Codepipeline pipeline, CodeBuild project, and" + 
-"IAM roles with necessary permissions."
+const desc: string =
+    'CloudFormation template used for provisioning all the necessary resources for the MLOps insfrastructure, ' +
+    'for Fetal Movement Analysis project. Resources include: S3 buckets, Lambda functions, Codepipeline pipeline, CodeBuild project, and' +
+    'IAM roles with necessary permissions.';
 
 const app = new App();
 new InfrastractureStack(app, `${projectConfig.projectName}-MLOpsInfraStack`, {

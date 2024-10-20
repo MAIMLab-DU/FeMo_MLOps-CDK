@@ -121,10 +121,12 @@ export class CodePipelineConstruct extends Construct {
                 privileged: true,
             },
         });
-        buildProject.addToRolePolicy(new iam.PolicyStatement({
-            actions: ['ssm:GetParameters', 'ssm:GetParameter', 'ssm:GetParameterHistory'],
-            resources: [`arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/CodeBuild/*`], 
-          }));
+        buildProject.addToRolePolicy(
+            new iam.PolicyStatement({
+                actions: ['ssm:GetParameters', 'ssm:GetParameter', 'ssm:GetParameterHistory'],
+                resources: [`arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/CodeBuild/*`],
+            })
+        );
 
         const build = new codepipeline_actions.CodeBuildAction({
             actionName: 'CIBuild',
@@ -141,7 +143,7 @@ export class CodePipelineConstruct extends Construct {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: Stack.of(this).region,
                 },
-            }
+            },
         });
 
         this.pipeline.addStage({
