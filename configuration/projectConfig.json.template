@@ -2,6 +2,7 @@
     "projectName": "FeMo",
     "repoType": "git",
     "dataBucketName": "",
+    "ciBucketName": "",
     "triggerPeriod": 1,
     "minNumberofFiles": 2,
     "gitML": {
