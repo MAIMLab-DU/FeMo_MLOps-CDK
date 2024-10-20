@@ -21,6 +21,7 @@ export type CodePipelineConstructProps = {
 
 export interface CodePipelineConstructPropsGithubSource {
     readonly repoType: 'git';
+    readonly ciBucketName: string;
     readonly gitML: {
         readonly githubConnectionArn: string;
         readonly githubRepoOwner: string;
@@ -118,7 +119,15 @@ export class CodePipelineConstruct extends Construct {
                 buildImage: codebuild.LinuxBuildImage.STANDARD_6_0,
                 privileged: true,
             },
+            environmentVariables: {
+                S3_BUCKET: { value: props.ciBucketName, },
+                AWS_DEFAULT_REGION: { value: Stack.of(this).region },
+            }
         });
+        buildProject.addToRolePolicy(new iam.PolicyStatement({
+            actions: ['ssm:GetParameters', 'ssm:GetParameter', 'ssm:GetParameterHistory'],
+            resources: [`arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/CodeBuild/*`], 
+          }));
 
         const build = new codepipeline_actions.CodeBuildAction({
             actionName: 'CIBuild',
