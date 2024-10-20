@@ -1,16 +1,16 @@
 import json
 import os
 import boto3
-import zipfile
-import tempfile
 from datetime import datetime
 from botocore.exceptions import ClientError
+import tempfile
 
 # Initialize the S3 client
 s3_client = boto3.client('s3')
 DATA_BUCKET_NAME = os.environ.get('DATA_BUCKET_NAME', '')
 MANIFEST_BUCKET_NAME = os.environ.get('DATA_MANIFEST_BUCKET_NAME', '')
 MIN_DIFF = int(os.environ.get('MIN_DIFF', 1))
+
 
 def list_all_objects(bucket_name):
     """List all objects in the specified S3 bucket, handle pagination."""
@@ -43,17 +43,13 @@ def build_manifest_file_content(previous_manifest=None):
     """Create a manifest content from the current state of the S3 bucket."""
     all_objects = list_all_objects(DATA_BUCKET_NAME)
     version = datetime.now().strftime("%Y-%m-%d_%H:%M")
-    print(f"Current manifest item count: {len(all_objects)}")
 
     if previous_manifest is None:
-        if len(all_objects) == 0:
-            return None
-        else:
-            current_manifest = {
-                "version": version,
-                "lastNumObjects": len(all_objects),
-                "items": all_objects
-            }
+        current_manifest = {
+            "version": version,
+            "lastNumObjects": len(all_objects),
+            "items": all_objects
+        }
     else:
         difference = len(all_objects) - previous_manifest['lastNumObjects']
         if difference >= MIN_DIFF:
@@ -70,11 +66,6 @@ def build_manifest_file_content(previous_manifest=None):
 
 def upload_manifest_to_s3(file_content):
     """Upload the manifest.json file directly to the specified S3 bucket."""
-    temp_dir = tempfile.gettempdir()
-    zip_file_path = os.path.join(temp_dir, "manifest.json.zip")
-    with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        zipf.writestr("manifest.json", file_content)
-
     try:
         s3_client.put_object(
             Bucket=MANIFEST_BUCKET_NAME,
@@ -82,16 +73,9 @@ def upload_manifest_to_s3(file_content):
             Body=file_content,
             ContentType='application/json'
         )
-        with open(zip_file_path, 'rb') as file_data:
-            s3_client.put_object(
-                Bucket=MANIFEST_BUCKET_NAME,
-                Key="manifest.json.zip",
-                Body=file_data
-            )
-
         print(f"Uploaded manifest.json to {MANIFEST_BUCKET_NAME}")
     except ClientError as e:
-        print(f"Error uploading to S3: {e}")
+        print(f"Error uploading manifest.json to S3: {e}")
         raise e
 
 def check_and_read_manifest():
@@ -107,7 +91,7 @@ def check_and_read_manifest():
         
         with open(manifest_file_path, 'r') as manifest_file:
             manifest_content = json.load(manifest_file)
-            print(f"Previous manifest item count: {len(manifest_content['items'])}")
+            print(f"Manifest content: {manifest_content}")
         
         return manifest_content
 
@@ -118,6 +102,8 @@ def check_and_read_manifest():
             print(f"Error checking or downloading manifest.json: {e}")
         return None
 
+# TODO: belt type from MAC addresses
+# TODO: manual triggering if event is not None
 def handler(event, context):
     """Lambda function handler for periodic execution."""
     print("Lambda triggered by periodic event")
