@@ -11,6 +11,7 @@ import * as codepipeline_actions from 'aws-cdk-lib/aws-codepipeline-actions';
 
 export type CodePipelineConstructPropsBase = {
     readonly projectName: string;
+    readonly sageMakerForceExtractFeatures: boolean;
 } & CodePipelineConstructPropsGithubSource;
 
 export type CodePipelineConstructProps = {
@@ -197,6 +198,20 @@ export class CodePipelineConstruct extends Construct {
             })
         );
 
+        mlPipelineRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: [
+                    'ssm:GetParameters',
+                    'ssm:GetParameter',
+                    'ssm:GetParameterHistory'
+                ],
+                Resource: [
+                    `arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/CodeBuild/*`
+                ],
+            })
+        )
+
         const mlPipelineProject = new codebuild.PipelineProject(this, 'MLPipeline', {
             buildSpec: codebuild.BuildSpec.fromSourceFilename('./buildspecs/pipeline.yml'),
             role: mlPipelineRole,
@@ -212,6 +227,14 @@ export class CodePipelineConstruct extends Construct {
             extraInputs: [buildOutputML],
             outputs: [pipelineOutput],
             environmentVariables: {
+                AWS_DEFAULT_REGION: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: Stack.of(this).region,
+                },
+                FORCE_EXTRACT_FEATURES: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: props.sageMakerForceExtractFeatures,
+                },
                 SAGEMAKER_ARTIFACT_BUCKET: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: props.sageMakerArtifactBucket.bucketName,
