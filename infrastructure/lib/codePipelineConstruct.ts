@@ -21,6 +21,7 @@ export type CodePipelineConstructProps = {
 
 export interface CodePipelineConstructPropsGithubSource {
     readonly repoType: 'git';
+    readonly ciBucketName: string;
     readonly gitML: {
         readonly githubConnectionArn: string;
         readonly githubRepoOwner: string;
@@ -51,7 +52,8 @@ export class CodePipelineConstruct extends Construct {
         const sourceMLCodeOutput = new codepipeline.Artifact('SourceMLCodeOutput');
         const sourceCDKCodeOutput = new codepipeline.Artifact('SourceCDKCodeOutput');
         const sourceDataOutput = new codepipeline.Artifact('SourceDataOutput');
-        const buildOutput = new codepipeline.Artifact('BuildOutput');
+        const buildOutputCDK = new codepipeline.Artifact('BuildOutputCDK');
+        const buildOutputML = new codepipeline.Artifact('BuildOutputML');
         const pipelineOutput = new codepipeline.Artifact('PipelineOutput');
 
         //Source Code
@@ -80,6 +82,7 @@ export class CodePipelineConstruct extends Construct {
             output: sourceDataOutput,
             bucket: props.dataManifestBucket,
             bucketKey: 'manifest.json.zip',
+            trigger: codepipeline_actions.S3Trigger.EVENTS,
         });
 
         this.pipeline.addStage({
@@ -119,13 +122,29 @@ export class CodePipelineConstruct extends Construct {
                 privileged: true,
             },
         });
+        buildProject.addToRolePolicy(
+            new iam.PolicyStatement({
+                actions: ['ssm:GetParameters', 'ssm:GetParameter', 'ssm:GetParameterHistory'],
+                resources: [`arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/CodeBuild/*`],
+            })
+        );
 
         const build = new codepipeline_actions.CodeBuildAction({
             actionName: 'CIBuild',
             project: buildProject,
             input: sourceCDKCodeOutput,
             extraInputs: [sourceMLCodeOutput, sourceDataOutput],
-            outputs: [buildOutput],
+            outputs: [buildOutputCDK, buildOutputML],
+            environmentVariables: {
+                S3_CIBUCKET: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: props.ciBucketName,
+                },
+                AWS_DEFAULT_REGION: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: Stack.of(this).region,
+                },
+            },
         });
 
         this.pipeline.addStage({
@@ -189,7 +208,8 @@ export class CodePipelineConstruct extends Construct {
         const mlPipelie = new codepipeline_actions.CodeBuildAction({
             actionName: 'MLPipeline',
             project: mlPipelineProject,
-            input: buildOutput,
+            input: buildOutputCDK,
+            extraInputs: [buildOutputML],
             outputs: [pipelineOutput],
             environmentVariables: {
                 SAGEMAKER_ARTIFACT_BUCKET: {
@@ -329,7 +349,7 @@ export class CodePipelineConstruct extends Construct {
             actionName: 'Deploy',
             runOrder: 2,
             project: deployProject,
-            input: buildOutput,
+            input: buildOutputCDK,
             extraInputs: [pipelineOutput],
         });
 

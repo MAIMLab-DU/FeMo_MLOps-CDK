@@ -136,5 +136,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-my-cdk-app/
-test-cdk-app/
+configuration/projectConfig.json
+.ruff_cache/
