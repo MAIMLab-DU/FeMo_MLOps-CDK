@@ -6,7 +6,7 @@ set -e
 
 VIRTUAL_ENV=.venv
 
-pushd ${CODEBUILD_SRC_DIR_SourceMLCodeOutput}/ml_pipeline
+pushd ${CODEBUILD_SRC_DIR_SourceMLCodeOutput}/aws_sagemaker
 
 # Set up virtual env
 virtualenv -p python3 $VIRTUAL_ENV
@@ -26,6 +26,3 @@ echo "Create/Update of the SageMaker Pipeline and execution Completed."
 
 # Deactivate virtual envs
 deactivate
-
-export MODEL_PACKAGE_NAME=`cat ${CODEBUILD_SRC_DIR_SourceMLCodeOutput}/ml_pipeline/pipelineExecutionArn` 
-echo "{\"arn\": \"${MODEL_PACKAGE_NAME}\"}" > pipelineExecution.json
