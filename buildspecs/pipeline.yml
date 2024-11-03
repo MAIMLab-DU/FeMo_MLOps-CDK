@@ -3,6 +3,10 @@ version: 0.2
 env:
   variables:
     pythonversion: 3.10
+  
+  parameter-store:
+    AWS_ACCESS_KEY_ID: /CodeBuild/AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY: /CodeBuild/AWS_SECRET_ACCESS_KEY
 
 phases:
   install:
