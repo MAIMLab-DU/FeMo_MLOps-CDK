@@ -25,6 +25,7 @@ export class InfrastractureStack extends Stack {
             dataManifestBucket: dataSource.dataManifestBucket,
             sageMakerArtifactBucket: sageMaker.sagemakerArtifactBucket,
             sageMakerExecutionRole: sageMaker.sagemakerExecutionRole,
+            sageMakerForceExtractFeatures: props.sageMakerForceExtractFeatures,
         });
 
         new CfnOutput(this, 'CodePipelineOutput', {
