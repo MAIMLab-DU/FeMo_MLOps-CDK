@@ -201,16 +201,10 @@ export class CodePipelineConstruct extends Construct {
         mlPipelineRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
-                Action: [
-                    'ssm:GetParameters',
-                    'ssm:GetParameter',
-                    'ssm:GetParameterHistory'
-                ],
-                Resource: [
-                    `arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/CodeBuild/*`
-                ],
+                Action: ['ssm:GetParameters', 'ssm:GetParameter', 'ssm:GetParameterHistory'],
+                Resource: [`arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/CodeBuild/*`],
             })
-        )
+        );
 
         const mlPipelineProject = new codebuild.PipelineProject(this, 'MLPipeline', {
             buildSpec: codebuild.BuildSpec.fromSourceFilename('./buildspecs/pipeline.yml'),
