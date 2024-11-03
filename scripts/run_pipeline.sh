@@ -6,7 +6,7 @@ set -e
 
 VIRTUAL_ENV=.venv
 
-pushd ${CODEBUILD_SRC_DIR_SourceMLCodeOutput}/aws_sagemaker
+pushd ${CODEBUILD_SRC_DIR_BuildOutputML}/aws_sagemaker
 
 # Set up virtual env
 virtualenv -p python3 $VIRTUAL_ENV
