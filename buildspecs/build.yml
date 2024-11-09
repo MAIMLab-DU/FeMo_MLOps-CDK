@@ -29,8 +29,6 @@ artifacts:
       files:
         - '**/*'
       exclude-paths:
-        - '*/node_modules/**/*'
-        - '*/cdk.out/**/*'
         - '*/**/*/.venv/**/*' 
         - '*/**/*/*_cache*/**/*'
     BuildOutputML:
