@@ -3,10 +3,10 @@ import { Stack, StackProps, CfnOutput } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { CodePipelineConstruct, CodePipelineConstructPropsBase } from './codePipelineConstruct';
 import { DataSourceConstruct, DataSourceConstructProps } from './dataSourceConstruct';
-import { EcrConstruct, EcrConstructProps } from './ecrRepositoryConstruct'
+import { EcrConstruct } from './ecrRepositoryConstruct'
 import { SageMakerConstruct } from './sageMakerConstruct';
 
-export type InfrastractureStackProps = CodePipelineConstructPropsBase & StackProps & DataSourceConstructProps & EcrConstructProps;
+export type InfrastractureStackProps = CodePipelineConstructPropsBase & StackProps & DataSourceConstructProps;
 
 export class InfrastractureStack extends Stack {
     constructor(scope: Construct, id: string, props: InfrastractureStackProps) {
@@ -17,12 +17,12 @@ export class InfrastractureStack extends Stack {
         });
 
         const ecrRepos = new EcrConstruct(this, 'EcrRepository', {
-            repositoryNameProcessImage: `${Stack.of(this).account}.dkr.ecr.${Stack.of(this).region}.amazonaws.com/${
+            repoProcessImage: `${Stack.of(this).account}.dkr.ecr.${Stack.of(this).region}.amazonaws.com/${
                         props.projectName
-                    }-processImage`,
-            repositoryNameTrainImage: `${Stack.of(this).account}.dkr.ecr.${Stack.of(this).region}.amazonaws.com/${
+                    }-processImage:latest`,
+            repoTrainImage: `${Stack.of(this).account}.dkr.ecr.${Stack.of(this).region}.amazonaws.com/${
                         props.projectName
-                    }-trainImage`,
+                    }-trainImage:latest`,
         });
 
         const sageMaker = new SageMakerConstruct(this, 'SageMakerConstruct', {

@@ -228,11 +228,11 @@ export class CodePipelineConstruct extends Construct {
                 },
                 PROCESSING_IMAGE_URI: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: `${props.processingImageUri}:latest`,
+                    value: props.processingImageUri,
                 },
                 TRAINING_IMAGE_URI: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: `${props.trainingImageUri}:latest`,
+                    value: props.trainingImageUri,
                 },
                 FORCE_EXTRACT_FEATURES: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
