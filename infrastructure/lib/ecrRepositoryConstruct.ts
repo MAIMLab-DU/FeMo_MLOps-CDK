@@ -21,12 +21,12 @@ export class EcrConstruct extends Construct {
         super(scope, id);
 
         // Create an ECR repository
-        this.ecrRepositoryProcess = new ecr.Repository(this, 'EcrRepository', {
+        this.ecrRepositoryProcess = new ecr.Repository(this, 'EcrProcessRepository', {
             repositoryName: props.repoProcessImage,
         });
         this.ecrRepositoryProcess.applyRemovalPolicy(RemovalPolicy.RETAIN);
 
-        this.ecrRepositoryTrain = new ecr.Repository(this, 'EcrRepository', {
+        this.ecrRepositoryTrain = new ecr.Repository(this, 'EcrTrainRepository', {
             repositoryName: props.repoTrainImage,
         });
         this.ecrRepositoryTrain.applyRemovalPolicy(RemovalPolicy.RETAIN);
