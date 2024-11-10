@@ -15,6 +15,8 @@ export type CodePipelineConstructPropsBase = {
 
 export type CodePipelineConstructProps = {
     readonly dataManifestBucket: s3.Bucket;
+    readonly processingImageUri: string;
+    readonly trainingImageUri: string;
     readonly sageMakerArtifactBucket: s3.Bucket;
     readonly sageMakerExecutionRole: iam.Role;
 } & CodePipelineConstructPropsBase;
@@ -223,6 +225,14 @@ export class CodePipelineConstruct extends Construct {
                 AWS_DEFAULT_REGION: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: Stack.of(this).region,
+                },
+                PROCESSING_IMAGE_URI: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: `${props.processingImageUri}:latest`,
+                },
+                TRAINING_IMAGE_URI: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: `${props.trainingImageUri}:latest`,
                 },
                 FORCE_EXTRACT_FEATURES: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,

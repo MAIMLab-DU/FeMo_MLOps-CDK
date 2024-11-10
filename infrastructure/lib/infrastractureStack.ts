@@ -3,9 +3,10 @@ import { Stack, StackProps, CfnOutput } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { CodePipelineConstruct, CodePipelineConstructPropsBase } from './codePipelineConstruct';
 import { DataSourceConstruct, DataSourceConstructProps } from './dataSourceConstruct';
+import { EcrConstruct, EcrConstructProps } from './ecrRepositoryConstruct'
 import { SageMakerConstruct } from './sageMakerConstruct';
 
-export type InfrastractureStackProps = CodePipelineConstructPropsBase & StackProps & DataSourceConstructProps;
+export type InfrastractureStackProps = CodePipelineConstructPropsBase & StackProps & DataSourceConstructProps & EcrConstructProps;
 
 export class InfrastractureStack extends Stack {
     constructor(scope: Construct, id: string, props: InfrastractureStackProps) {
@@ -15,6 +16,15 @@ export class InfrastractureStack extends Stack {
             ...props,
         });
 
+        const ecrRepos = new EcrConstruct(this, 'EcrRepository', {
+            repositoryNameProcessImage: `${Stack.of(this).account}.dkr.ecr.${Stack.of(this).region}.amazonaws.com/${
+                        props.projectName
+                    }-processImage`,
+            repositoryNameTrainImage: `${Stack.of(this).account}.dkr.ecr.${Stack.of(this).region}.amazonaws.com/${
+                        props.projectName
+                    }-trainImage`,
+        });
+
         const sageMaker = new SageMakerConstruct(this, 'SageMakerConstruct', {
             dataBucket: dataSource.dataBucket,
         });
@@ -22,6 +32,8 @@ export class InfrastractureStack extends Stack {
         const codePipeline = new CodePipelineConstruct(this, 'CodePipeline', {
             ...props,
             dataManifestBucket: dataSource.dataManifestBucket,
+            processingImageUri: ecrRepos.ecrRepositoryProcess.repositoryName,
+            trainingImageUri: ecrRepos.ecrRepositoryTrain.repositoryName,
             sageMakerArtifactBucket: sageMaker.sagemakerArtifactBucket,
             sageMakerExecutionRole: sageMaker.sagemakerExecutionRole,
             sageMakerForceExtractFeatures: props.sageMakerForceExtractFeatures,
@@ -36,6 +48,11 @@ export class InfrastractureStack extends Stack {
             value: dataSource.dataBucket.bucketName,
             exportName: 'FeMo-DataBucket',
         });
+
+        new CfnOutput(this, 'EcrExectionRoleOutput', {
+            value: ecrRepos.ecrExecutionRole.roleArn,
+            exportName: 'FeMo-EcrExecutionRole',
+        }); 
 
         new CfnOutput(this, 'DataManifestBucketOutput', {
             value: dataSource.dataManifestBucket.bucketName,
