@@ -5,7 +5,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import { RemovalPolicy } from 'aws-cdk-lib';
 
 export interface EcrConstructProps {
-    readonly repoImage: string;
+    readonly repositoryName: string;
 }
 
 /**
@@ -19,8 +19,8 @@ export class EcrConstruct extends Construct {
         super(scope, id);
 
         // Create an ECR repository
-        this.ecrRepository = new ecr.Repository(this, 'EcrProcessRepository', {
-            repositoryName: props.repoImage,
+        this.ecrRepository = new ecr.Repository(this, 'EcrRepository', {
+            repositoryName: props.repositoryName,
         });
         this.ecrRepository.applyRemovalPolicy(RemovalPolicy.RETAIN);
 

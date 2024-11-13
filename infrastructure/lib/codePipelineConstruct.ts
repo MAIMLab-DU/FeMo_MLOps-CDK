@@ -227,7 +227,7 @@ export class CodePipelineConstruct extends Construct {
                 },
                 IMAGE_URI: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: props.imageUri,
+                    value: `${props.imageUri}:latest`,
                 },
                 FORCE_EXTRACT_FEATURES: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
