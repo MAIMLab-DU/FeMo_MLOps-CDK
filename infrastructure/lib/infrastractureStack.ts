@@ -3,6 +3,7 @@ import { Stack, StackProps, CfnOutput } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { CodePipelineConstruct, CodePipelineConstructPropsBase } from './codePipelineConstruct';
 import { DataSourceConstruct, DataSourceConstructProps } from './dataSourceConstruct';
+import { DynamoDBConstruct } from './dynamoDbConstruct';
 import { EcrConstruct, EcrConstructProps } from './ecrRepositoryConstruct'
 import { SageMakerConstruct } from './sageMakerConstruct';
 
@@ -16,6 +17,9 @@ export class InfrastractureStack extends Stack {
             ...props,
         });
 
+        const dynamodb = new DynamoDBConstruct(this, 'DynamoDbConstruct', {
+            tableName: `${this.stackName}-${this.stackId}-inferenceJobResults`
+        })
         const ecrRepos = new EcrConstruct(this, 'EcrRepositoryConstruct', {
             repositoryName: `${props.projectName.toLowerCase()}/${props.repositoryName.toLowerCase()}`,
         });
@@ -43,6 +47,10 @@ export class InfrastractureStack extends Stack {
             exportName: 'FeMo-DataBucket',
         });
 
+        new CfnOutput(this, 'DynamoDbOutput', {
+            value: dynamodb.dynamoDBTable.tableArn,
+            exportName: 'FeMo-DynamoDbInferenceResults',
+        });
         new CfnOutput(this, 'EcrRepositoryOutput', {
             value: ecrRepos.ecrRepository.repositoryArn,
             exportName: 'FeMo-EcrRepository',
