@@ -5,31 +5,24 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import { RemovalPolicy } from 'aws-cdk-lib';
 
 export interface EcrConstructProps {
-    readonly repoProcessImage: string;
-    readonly repoTrainImage: string;
+    readonly repoImage: string;
 }
 
 /**
  * The CDK Construct provisions the ECR repository and an IAM role with necessary permissions.
  */
 export class EcrConstruct extends Construct {
-    readonly ecrRepositoryProcess: ecr.Repository;
-    readonly ecrRepositoryTrain: ecr.Repository;
+    readonly ecrRepository: ecr.Repository;
     readonly ecrExecutionRole: iam.Role;
 
     constructor(scope: Construct, id: string, props: EcrConstructProps) {
         super(scope, id);
 
         // Create an ECR repository
-        this.ecrRepositoryProcess = new ecr.Repository(this, 'EcrProcessRepository', {
-            repositoryName: props.repoProcessImage,
+        this.ecrRepository = new ecr.Repository(this, 'EcrProcessRepository', {
+            repositoryName: props.repoImage,
         });
-        this.ecrRepositoryProcess.applyRemovalPolicy(RemovalPolicy.RETAIN);
-
-        this.ecrRepositoryTrain = new ecr.Repository(this, 'EcrTrainRepository', {
-            repositoryName: props.repoTrainImage,
-        });
-        this.ecrRepositoryTrain.applyRemovalPolicy(RemovalPolicy.RETAIN);
+        this.ecrRepository.applyRemovalPolicy(RemovalPolicy.RETAIN);
 
         // Create an IAM role for ECR interactions
         this.ecrExecutionRole = new iam.Role(this, 'EcrExecutionRole', {
@@ -48,8 +41,7 @@ export class EcrConstruct extends Construct {
                     'ecr:PutImage',
                 ],
                 resources: [
-                    this.ecrRepositoryProcess.repositoryArn,
-                    this.ecrRepositoryTrain.repositoryArn,
+                    this.ecrRepository.repositoryArn,
                 ],
             })
         );

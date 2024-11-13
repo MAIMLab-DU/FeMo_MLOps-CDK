@@ -17,12 +17,9 @@ export class InfrastractureStack extends Stack {
         });
 
         const ecrRepos = new EcrConstruct(this, 'EcrRepository', {
-            repoProcessImage: `${Stack.of(this).account}.dkr.ecr.${Stack.of(this).region}.amazonaws.com/${
+            repoImage: `${Stack.of(this).account}.dkr.ecr.${Stack.of(this).region}.amazonaws.com/${
                         props.projectName
-                    }-processImage:latest`,
-            repoTrainImage: `${Stack.of(this).account}.dkr.ecr.${Stack.of(this).region}.amazonaws.com/${
-                        props.projectName
-                    }-trainImage:latest`,
+                    }-Image:latest`,
         });
 
         const sageMaker = new SageMakerConstruct(this, 'SageMakerConstruct', {
@@ -32,8 +29,7 @@ export class InfrastractureStack extends Stack {
         const codePipeline = new CodePipelineConstruct(this, 'CodePipeline', {
             ...props,
             dataManifestBucket: dataSource.dataManifestBucket,
-            processingImageUri: ecrRepos.ecrRepositoryProcess.repositoryName,
-            trainingImageUri: ecrRepos.ecrRepositoryTrain.repositoryName,
+            imageUri: ecrRepos.ecrRepository.repositoryName,
             sageMakerArtifactBucket: sageMaker.sagemakerArtifactBucket,
             sageMakerExecutionRole: sageMaker.sagemakerExecutionRole,
             sageMakerForceExtractFeatures: props.sageMakerForceExtractFeatures,
