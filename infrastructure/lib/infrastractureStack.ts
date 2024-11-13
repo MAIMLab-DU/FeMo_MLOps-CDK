@@ -29,14 +29,17 @@ export class InfrastractureStack extends Stack {
 
         const sageMaker = new SageMakerConstruct(this, 'SageMakerConstruct', {
             dataBucket: dataSource.dataBucket,
+            dynamoDbTable: dynamodb.dynamoDBTable,
         });
 
         const codePipeline = new CodePipelineConstruct(this, 'CodePipeline', {
             ...props,
             dataManifestBucket: dataSource.dataManifestBucket,
-            dynamoDbTableName: dynamodb.dynamoDBTable.tableName,
-            imageUri: ecrRepos.ecrRepository.repositoryUri,
+            dynamoDbTable: dynamodb.dynamoDBTable,
+            ecrRepo: ecrRepos.ecrRepository,
             sageMakerArtifactBucket: sageMaker.sagemakerArtifactBucket,
+            dynamoDbExecutionRole: dynamodb.dynamoDBExecutionRole,
+            ecrExecutionRole: ecrRepos.ecrExecutionRole,
             sageMakerExecutionRole: sageMaker.sagemakerExecutionRole,
             sageMakerForceExtractFeatures: props.sageMakerForceExtractFeatures,
         });
@@ -55,9 +58,20 @@ export class InfrastractureStack extends Stack {
             value: dynamodb.dynamoDBTable.tableArn,
             exportName: 'FeMo-DynamoDbInferenceResults',
         });
+
+        new CfnOutput(this, 'DynamoDbExecutionRoleOutput', {
+            value: dynamodb.dynamoDBExecutionRole.roleArn,
+            exportName: 'FeMo-DynamoDbExecutionRole',
+        });
+
         new CfnOutput(this, 'EcrRepositoryOutput', {
             value: ecrRepos.ecrRepository.repositoryArn,
             exportName: 'FeMo-EcrRepository',
+        });
+
+        new CfnOutput(this, 'EcrExecutionRoleOutput', {
+            value: ecrRepos.ecrExecutionRole.roleArn,
+            exportName: 'FeMo-EcrExecutionRole',
         });
 
         new CfnOutput(this, 'DataManifestBucketOutput', {
