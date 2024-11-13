@@ -40,9 +40,7 @@ export class EcrConstruct extends Construct {
                     'ecr:BatchCheckLayerAvailability',
                     'ecr:PutImage',
                 ],
-                resources: [
-                    this.ecrRepository.repositoryArn,
-                ],
+                resources: [this.ecrRepository.repositoryArn],
             })
         );
     }

@@ -4,7 +4,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 
 export interface DynamoDBConstructProps {
-    readonly tableName: string;  // The name of the DynamoDB table to create
+    readonly tableName: string; // The name of the DynamoDB table to create
 }
 
 /**
@@ -34,7 +34,13 @@ export class DynamoDBConstruct extends Construct {
         this.dynamoDBExecutionRole.addToPolicy(
             new iam.PolicyStatement({
                 effect: iam.Effect.ALLOW,
-                actions: ['dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:Query', 'dynamodb:Scan', 'dynamodb:UpdateItem'],
+                actions: [
+                    'dynamodb:GetItem',
+                    'dynamodb:PutItem',
+                    'dynamodb:Query',
+                    'dynamodb:Scan',
+                    'dynamodb:UpdateItem',
+                ],
                 resources: [this.dynamoDBTable.tableArn],
             })
         );

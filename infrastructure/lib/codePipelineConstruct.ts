@@ -16,6 +16,7 @@ export type CodePipelineConstructPropsBase = {
 export type CodePipelineConstructProps = {
     readonly dataManifestBucket: s3.Bucket;
     readonly imageUri: string;
+    readonly dynamoDbTableName: string;
     readonly sageMakerArtifactBucket: s3.Bucket;
     readonly sageMakerExecutionRole: iam.Role;
 } & CodePipelineConstructPropsBase;
@@ -228,6 +229,10 @@ export class CodePipelineConstruct extends Construct {
                 IMAGE_URI: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: `${props.imageUri}:latest`,
+                },
+                DYNAMODB_TABLE: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: props.dynamoDbTableName,
                 },
                 FORCE_EXTRACT_FEATURES: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
