@@ -3,6 +3,7 @@ import { Stack, StackProps, CfnOutput } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { CodePipelineConstruct, CodePipelineConstructPropsBase } from './codePipelineConstruct';
 import { DataSourceConstruct, DataSourceConstructProps } from './dataSourceConstruct';
+import { DynamoDBConstruct } from './dynamoDbConstruct';
 import { SageMakerConstruct } from './sageMakerConstruct';
 
 export type InfrastractureStackProps = CodePipelineConstructPropsBase & StackProps & DataSourceConstructProps;
@@ -14,6 +15,10 @@ export class InfrastractureStack extends Stack {
         const dataSource = new DataSourceConstruct(this, 'DataSource', {
             ...props,
         });
+
+        const dynamodb = new DynamoDBConstruct(this, 'DynamoDbConstruct', {
+            tableName: `${this.stackName}-${this.stackId}-inferenceJobResults`
+        })
 
         const sageMaker = new SageMakerConstruct(this, 'SageMakerConstruct', {
             dataBucket: dataSource.dataBucket,
@@ -35,6 +40,11 @@ export class InfrastractureStack extends Stack {
         new CfnOutput(this, 'DataBucketOutput', {
             value: dataSource.dataBucket.bucketName,
             exportName: 'FeMo-DataBucket',
+        });
+
+        new CfnOutput(this, 'DynamoDbOutput', {
+            value: dynamodb.dynamoDBTable.tableArn,
+            exportName: 'FeMo-DynamoDbInferenceResults',
         });
 
         new CfnOutput(this, 'DataManifestBucketOutput', {
