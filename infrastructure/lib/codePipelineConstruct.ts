@@ -50,7 +50,6 @@ export class CodePipelineConstruct extends Construct {
 
         this.pipeline = new codepipeline.Pipeline(this, 'MLOpsPipeline', {
             pipelineType: codepipeline.PipelineType.V2,
-            restartExecutionOnUpdate: true,
         });
 
         const sourceMLCodeOutput = new codepipeline.Artifact('SourceMLCodeOutput');
@@ -137,6 +136,13 @@ export class CodePipelineConstruct extends Construct {
             new iam.PolicyStatement({
                 actions: ['ecr:*'],
                 resources: [props.ecrRepo.repositoryArn, `${props.ecrRepo.repositoryArn}/*`],
+            })
+        );
+
+        buildProject.addToRolePolicy(
+            new iam.PolicyStatement({
+                actions: ['codepipeline:ListPipelineExecutions'],
+                resources: [`arn:aws:codepipeline:${Stack.of(this).region}:${Stack.of(this).account}:*`],
             })
         );
 
