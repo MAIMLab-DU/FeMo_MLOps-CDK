@@ -29,6 +29,7 @@ virtualenv -p python3 $VIRTUAL_ENV
 
 #Install requirements
 pip install -r requirements.txt
+pip install -e ..
 
 echo "Starting Pipeline Execution"
 export PYTHONUNBUFFERED=TRUE
