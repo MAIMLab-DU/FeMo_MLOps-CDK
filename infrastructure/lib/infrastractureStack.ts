@@ -4,10 +4,13 @@ import { Construct } from 'constructs';
 import { CodePipelineConstruct, CodePipelineConstructPropsBase } from './codePipelineConstruct';
 import { DataSourceConstruct, DataSourceConstructProps } from './dataSourceConstruct';
 import { DynamoDBConstruct } from './dynamoDbConstruct';
-import { EcrConstruct, EcrConstructProps } from './ecrRepositoryConstruct'
+import { EcrConstruct, EcrConstructProps } from './ecrRepositoryConstruct';
 import { SageMakerConstruct } from './sageMakerConstruct';
 
-export type InfrastractureStackProps = CodePipelineConstructPropsBase & StackProps & DataSourceConstructProps & EcrConstructProps;
+export type InfrastractureStackProps = CodePipelineConstructPropsBase &
+    StackProps &
+    DataSourceConstructProps &
+    EcrConstructProps;
 
 export class InfrastractureStack extends Stack {
     constructor(scope: Construct, id: string, props: InfrastractureStackProps) {
@@ -18,8 +21,8 @@ export class InfrastractureStack extends Stack {
         });
 
         const dynamodb = new DynamoDBConstruct(this, 'DynamoDbConstruct', {
-            tableName: `${this.stackName}-${this.stackId}-inferenceJobResults`
-        })
+            tableName: `${this.stackName}-inferenceJobResults`,
+        });
         const ecrRepos = new EcrConstruct(this, 'EcrRepositoryConstruct', {
             repositoryName: `${props.projectName.toLowerCase()}/${props.repositoryName.toLowerCase()}`,
         });
@@ -31,6 +34,7 @@ export class InfrastractureStack extends Stack {
         const codePipeline = new CodePipelineConstruct(this, 'CodePipeline', {
             ...props,
             dataManifestBucket: dataSource.dataManifestBucket,
+            dynamoDbTableName: dynamodb.dynamoDBTable.tableName,
             imageUri: ecrRepos.ecrRepository.repositoryUri,
             sageMakerArtifactBucket: sageMaker.sagemakerArtifactBucket,
             sageMakerExecutionRole: sageMaker.sagemakerExecutionRole,
@@ -54,7 +58,7 @@ export class InfrastractureStack extends Stack {
         new CfnOutput(this, 'EcrRepositoryOutput', {
             value: ecrRepos.ecrRepository.repositoryArn,
             exportName: 'FeMo-EcrRepository',
-        }); 
+        });
 
         new CfnOutput(this, 'DataManifestBucketOutput', {
             value: dataSource.dataManifestBucket.bucketName,

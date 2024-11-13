@@ -21,5 +21,5 @@ new InfrastractureStack(app, `${projectConfig.projectName}-MLOpsInfraStack`, {
     sageMakerForceExtractFeatures: projectConfig.forceExtractFeatures,
     gitML: projectConfig.gitML,
     gitCDK: projectConfig.gitCDK,
-    description: desc
+    description: desc,
 });
