@@ -13,6 +13,7 @@ const app = new App();
 new InfrastractureStack(app, `${projectConfig.projectName}-MLOpsInfraStack`, {
     projectName: projectConfig.projectName,
     repoType: 'git',
+    repositoryName: projectConfig.imageRepoName,
     existingDataBucketName: projectConfig.dataBucketName,
     ciBucketName: projectConfig.ciBucketName,
     triggerPeriod: projectConfig.triggerPeriod,
@@ -20,5 +21,5 @@ new InfrastractureStack(app, `${projectConfig.projectName}-MLOpsInfraStack`, {
     sageMakerForceExtractFeatures: projectConfig.forceExtractFeatures,
     gitML: projectConfig.gitML,
     gitCDK: projectConfig.gitCDK,
-    description: desc,
+    description: desc
 });
