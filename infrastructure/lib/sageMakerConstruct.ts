@@ -47,14 +47,7 @@ export class SageMakerConstruct extends Construct {
         this.sagemakerExecutionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
-                Action: [
-                    'dynamodb:PutItem',
-                    'dynamodb:GetItem',
-                    'dynamodb:Query',
-                    'dynamodb:UpdateItem',
-                    'dynamodb:GetRecords',
-                    'dynamodb:Scan',
-                ],
+                Action: ['dynamodb:*'],
                 Resource: [props.dynamoDbTable.tableArn, `${props.dynamoDbTable.tableArn}/*`],
             })
         );

@@ -20,8 +20,6 @@ export type CodePipelineConstructProps = {
     readonly dynamoDbTable: dynamodb.Table;
     readonly ecrRepo: ecr.Repository;
     readonly sageMakerArtifactBucket: s3.Bucket;
-    readonly dynamoDbExecutionRole: iam.Role;
-    readonly ecrExecutionRole: iam.Role;
     readonly sageMakerExecutionRole: iam.Role;
 } & CodePipelineConstructPropsBase;
 
@@ -137,12 +135,7 @@ export class CodePipelineConstruct extends Construct {
 
         buildProject.addToRolePolicy(
             new iam.PolicyStatement({
-                actions: [
-                    'ecr:GetDownloadUrlForLayer',
-                    'ecr:BatchGetImage',
-                    'ecr:BatchCheckLayerAvailability',
-                    'ecr:PutImage',
-                ],
+                actions: ['ecr:*'],
                 resources: [props.ecrRepo.repositoryArn, `${props.ecrRepo.repositoryArn}/*`],
             })
         );
@@ -212,22 +205,6 @@ export class CodePipelineConstruct extends Construct {
                 Effect: 'Allow',
                 Action: ['iam:PassRole'],
                 Resource: [props.sageMakerExecutionRole.roleArn],
-            })
-        );
-
-        mlPipelineRole.addToPolicy(
-            iam.PolicyStatement.fromJson({
-                Effect: 'Allow',
-                Action: ['iam:PassRole'],
-                Resource: [props.dynamoDbExecutionRole.roleArn],
-            })
-        );
-
-        mlPipelineRole.addToPolicy(
-            iam.PolicyStatement.fromJson({
-                Effect: 'Allow',
-                Action: ['iam:PassRole'],
-                Resource: [props.ecrExecutionRole.roleArn],
             })
         );
 
@@ -381,22 +358,6 @@ export class CodePipelineConstruct extends Construct {
         );
 
         deployRole.addToPolicy(
-            iam.PolicyStatement.fromJson({
-                Effect: 'Allow',
-                Action: ['iam:PassRole'],
-                Resource: [props.dynamoDbExecutionRole.roleArn],
-            })
-        );
-
-        deployRole.addToPolicy(
-            iam.PolicyStatement.fromJson({
-                Effect: 'Allow',
-                Action: ['iam:PassRole'],
-                Resource: [props.ecrExecutionRole.roleArn],
-            })
-        );
-
-        deployRole.addToPolicy(
             new iam.PolicyStatement({
                 actions: ['ssm:GetParameter'],
                 resources: [`arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/cdk-bootstrap/*`],
@@ -407,6 +368,14 @@ export class CodePipelineConstruct extends Construct {
             new iam.PolicyStatement({
                 actions: ['sts:AssumeRole', 'iam:PassRole'],
                 resources: [`arn:aws:iam::${Stack.of(this).account}:role/cdk*`],
+            })
+        );
+
+        deployRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: ['dynamodb:*'],
+                Resource: [props.dynamoDbTable.tableArn, `${props.dynamoDbTable.tableArn}/*`],
             })
         );
 

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT-0
 import { Construct } from 'constructs';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import { RemovalPolicy } from 'aws-cdk-lib';
 
 export interface EcrConstructProps {
@@ -13,7 +12,6 @@ export interface EcrConstructProps {
  */
 export class EcrConstruct extends Construct {
     readonly ecrRepository: ecr.Repository;
-    readonly ecrExecutionRole: iam.Role;
 
     constructor(scope: Construct, id: string, props: EcrConstructProps) {
         super(scope, id);
@@ -23,25 +21,5 @@ export class EcrConstruct extends Construct {
             repositoryName: props.repositoryName,
         });
         this.ecrRepository.applyRemovalPolicy(RemovalPolicy.RETAIN);
-
-        // Create an IAM role for ECR interactions
-        this.ecrExecutionRole = new iam.Role(this, 'EcrExecutionRole', {
-            assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
-            managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2ContainerRegistryFullAccess')],
-        });
-
-        // Grant permission for this role to pull/push images in this repository
-        this.ecrExecutionRole.addToPolicy(
-            new iam.PolicyStatement({
-                effect: iam.Effect.ALLOW,
-                actions: [
-                    'ecr:GetDownloadUrlForLayer',
-                    'ecr:BatchGetImage',
-                    'ecr:BatchCheckLayerAvailability',
-                    'ecr:PutImage',
-                ],
-                resources: [this.ecrRepository.repositoryArn],
-            })
-        );
     }
 }
