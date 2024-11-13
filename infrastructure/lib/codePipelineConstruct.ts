@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT-0
 import { Stack } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as sns from 'aws-cdk-lib/aws-sns';
@@ -15,9 +17,11 @@ export type CodePipelineConstructPropsBase = {
 
 export type CodePipelineConstructProps = {
     readonly dataManifestBucket: s3.Bucket;
-    readonly imageUri: string;
-    readonly dynamoDbTableName: string;
+    readonly dynamoDbTable: dynamodb.Table;
+    readonly ecrRepo: ecr.Repository;
     readonly sageMakerArtifactBucket: s3.Bucket;
+    readonly dynamoDbExecutionRole: iam.Role;
+    readonly ecrExecutionRole: iam.Role;
     readonly sageMakerExecutionRole: iam.Role;
 } & CodePipelineConstructPropsBase;
 
@@ -131,6 +135,18 @@ export class CodePipelineConstruct extends Construct {
             })
         );
 
+        buildProject.addToRolePolicy(
+            new iam.PolicyStatement({
+                actions: [
+                    'ecr:GetDownloadUrlForLayer',
+                    'ecr:BatchGetImage',
+                    'ecr:BatchCheckLayerAvailability',
+                    'ecr:PutImage',
+                ],
+                resources: [props.ecrRepo.repositoryArn, `${props.ecrRepo.repositoryArn}/*`],
+            })
+        );
+
         const build = new codepipeline_actions.CodeBuildAction({
             actionName: 'CIBuild',
             project: buildProject,
@@ -202,6 +218,22 @@ export class CodePipelineConstruct extends Construct {
         mlPipelineRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
+                Action: ['iam:PassRole'],
+                Resource: [props.dynamoDbExecutionRole.roleArn],
+            })
+        );
+
+        mlPipelineRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: ['iam:PassRole'],
+                Resource: [props.ecrExecutionRole.roleArn],
+            })
+        );
+
+        mlPipelineRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
                 Action: ['ssm:GetParameters', 'ssm:GetParameter', 'ssm:GetParameterHistory'],
                 Resource: [`arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/CodeBuild/*`],
             })
@@ -228,11 +260,11 @@ export class CodePipelineConstruct extends Construct {
                 },
                 IMAGE_URI: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: `${props.imageUri}:latest`,
+                    value: `${props.ecrRepo.repositoryUri}:latest`,
                 },
                 DYNAMODB_TABLE: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: props.dynamoDbTableName,
+                    value: props.dynamoDbTable.tableName,
                 },
                 FORCE_EXTRACT_FEATURES: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
@@ -345,6 +377,22 @@ export class CodePipelineConstruct extends Construct {
             new iam.PolicyStatement({
                 actions: ['s3:*Object', 's3:ListBucket', 's3:GetBucketLocation'],
                 resources: ['arn:aws:s3:::cdktoolkit-stagingbucket-*'],
+            })
+        );
+
+        deployRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: ['iam:PassRole'],
+                Resource: [props.dynamoDbExecutionRole.roleArn],
+            })
+        );
+
+        deployRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: ['iam:PassRole'],
+                Resource: [props.ecrExecutionRole.roleArn],
             })
         );
 
