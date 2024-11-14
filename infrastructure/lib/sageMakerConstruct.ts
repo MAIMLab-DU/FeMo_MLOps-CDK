@@ -21,6 +21,13 @@ export class SageMakerConstruct extends Construct {
         this.sagemakerArtifactBucket = new s3.Bucket(this, 'SageMakerArtifactBucket', {
             blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
             encryption: s3.BucketEncryption.S3_MANAGED,
+            cors: [
+                {
+                    allowedOrigins: ['*'],
+                    allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.POST],
+                    allowedHeaders: ['*'],
+                },
+            ],
         });
 
         this.sagemakerExecutionRole = new iam.Role(this, 'SageMakerExecutionRole', {
