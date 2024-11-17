@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT-0
 import { Stack } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as sns from 'aws-cdk-lib/aws-sns';
@@ -15,8 +17,8 @@ export type CodePipelineConstructPropsBase = {
 
 export type CodePipelineConstructProps = {
     readonly dataManifestBucket: s3.Bucket;
-    readonly imageUri: string;
-    readonly dynamoDbTableName: string;
+    readonly dynamoDbTable: dynamodb.Table;
+    readonly ecrRepo: ecr.Repository;
     readonly sageMakerArtifactBucket: s3.Bucket;
     readonly sageMakerExecutionRole: iam.Role;
 } & CodePipelineConstructPropsBase;
@@ -48,7 +50,6 @@ export class CodePipelineConstruct extends Construct {
 
         this.pipeline = new codepipeline.Pipeline(this, 'MLOpsPipeline', {
             pipelineType: codepipeline.PipelineType.V2,
-            restartExecutionOnUpdate: true,
         });
 
         const sourceMLCodeOutput = new codepipeline.Artifact('SourceMLCodeOutput');
@@ -128,6 +129,20 @@ export class CodePipelineConstruct extends Construct {
             new iam.PolicyStatement({
                 actions: ['ssm:GetParameters', 'ssm:GetParameter', 'ssm:GetParameterHistory'],
                 resources: [`arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/CodeBuild/*`],
+            })
+        );
+
+        buildProject.addToRolePolicy(
+            new iam.PolicyStatement({
+                actions: ['ecr:*'],
+                resources: [props.ecrRepo.repositoryArn, `${props.ecrRepo.repositoryArn}/*`],
+            })
+        );
+
+        buildProject.addToRolePolicy(
+            new iam.PolicyStatement({
+                actions: ['codepipeline:ListPipelineExecutions'],
+                resources: [`arn:aws:codepipeline:${Stack.of(this).region}:${Stack.of(this).account}:*`],
             })
         );
 
@@ -228,11 +243,11 @@ export class CodePipelineConstruct extends Construct {
                 },
                 IMAGE_URI: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: `${props.imageUri}:latest`,
+                    value: `${props.ecrRepo.repositoryUri}:latest`,
                 },
                 DYNAMODB_TABLE: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: props.dynamoDbTableName,
+                    value: props.dynamoDbTable.tableName,
                 },
                 FORCE_EXTRACT_FEATURES: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
@@ -359,6 +374,14 @@ export class CodePipelineConstruct extends Construct {
             new iam.PolicyStatement({
                 actions: ['sts:AssumeRole', 'iam:PassRole'],
                 resources: [`arn:aws:iam::${Stack.of(this).account}:role/cdk*`],
+            })
+        );
+
+        deployRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: ['dynamodb:*'],
+                Resource: [props.dynamoDbTable.tableArn, `${props.dynamoDbTable.tableArn}/*`],
             })
         );
 
