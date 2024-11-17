@@ -4,7 +4,7 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { RemovalPolicy } from 'aws-cdk-lib';
 
 export interface DynamoDBConstructProps {
-    readonly tableName: string; // The name of the DynamoDB table to create
+    readonly tableName: string;
 }
 
 /**
@@ -19,8 +19,11 @@ export class DynamoDBConstruct extends Construct {
         // Create a DynamoDB table
         this.dynamoDBTable = new dynamodb.Table(this, 'DynamoDBTable', {
             tableName: props.tableName,
-            partitionKey: { name: 'job_id', type: dynamodb.AttributeType.STRING }, // You can adjust the key schema as needed
-            billingMode: dynamodb.BillingMode.PAY_PER_REQUEST, // Adjust based on your needs (PAY_PER_REQUEST or PROVISIONED)
+            partitionKey: { name: 's3_key', type: dynamodb.AttributeType.STRING },
+            sortKey: { name: 'timeStamp', type: dynamodb.AttributeType.STRING },
+            billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+            encryption: dynamodb.TableEncryption.DEFAULT,
+            pointInTimeRecovery: true,
         });
         this.dynamoDBTable.applyRemovalPolicy(RemovalPolicy.RETAIN);
     }
