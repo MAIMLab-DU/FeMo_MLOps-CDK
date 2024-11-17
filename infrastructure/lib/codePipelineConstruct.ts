@@ -161,6 +161,18 @@ export class CodePipelineConstruct extends Construct {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: Stack.of(this).region,
                 },
+                AWS_ACCOUNT_ID: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: Stack.of(this).account,
+                },
+                ML_REPO_CONNECTION: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: props.gitML.githubConnectionArn,
+                },
+                ECR_REPOSITORY_NAME: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: props.ecrRepo.repositoryName,
+                },
             },
         });
 
