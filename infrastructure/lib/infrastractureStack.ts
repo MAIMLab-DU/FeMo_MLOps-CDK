@@ -31,8 +31,6 @@ export class InfrastractureStack extends Stack {
             dynamoDbTable: dynamodb.dynamoDBTable,
             ecrRepo: ecrRepos.ecrRepository,
             sageMakerArtifactBucket: sageMaker.sagemakerArtifactBucket,
-            dynamoDbExecutionRole: dynamodb.dynamoDBExecutionRole,
-            ecrExecutionRole: ecrRepos.ecrExecutionRole,
             sageMakerExecutionRole: sageMaker.sagemakerExecutionRole,
             sageMakerForceExtractFeatures: props.sageMakerForceExtractFeatures,
         });
@@ -55,11 +53,6 @@ export class InfrastractureStack extends Stack {
         new CfnOutput(this, 'EcrRepositoryOutput', {
             value: ecrRepos.ecrRepository.repositoryArn,
             exportName: 'FeMo-EcrRepository',
-        });
-
-        new CfnOutput(this, 'EcrExecutionRoleOutput', {
-            value: ecrRepos.ecrExecutionRole.roleArn,
-            exportName: 'FeMo-EcrExecutionRole',
         });
 
         new CfnOutput(this, 'DataManifestBucketOutput', {

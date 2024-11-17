@@ -20,8 +20,6 @@ export type CodePipelineConstructProps = {
     readonly dynamoDbTable: dynamodb.Table;
     readonly ecrRepo: ecr.Repository;
     readonly sageMakerArtifactBucket: s3.Bucket;
-    readonly dynamoDbExecutionRole: iam.Role;
-    readonly ecrExecutionRole: iam.Role;
     readonly sageMakerExecutionRole: iam.Role;
 } & CodePipelineConstructPropsBase;
 
@@ -219,22 +217,6 @@ export class CodePipelineConstruct extends Construct {
         mlPipelineRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
-                Action: ['iam:PassRole'],
-                Resource: [props.dynamoDbExecutionRole.roleArn],
-            })
-        );
-
-        mlPipelineRole.addToPolicy(
-            iam.PolicyStatement.fromJson({
-                Effect: 'Allow',
-                Action: ['iam:PassRole'],
-                Resource: [props.ecrExecutionRole.roleArn],
-            })
-        );
-
-        mlPipelineRole.addToPolicy(
-            iam.PolicyStatement.fromJson({
-                Effect: 'Allow',
                 Action: ['ssm:GetParameters', 'ssm:GetParameter', 'ssm:GetParameterHistory'],
                 Resource: [`arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/CodeBuild/*`],
             })
@@ -378,22 +360,6 @@ export class CodePipelineConstruct extends Construct {
             new iam.PolicyStatement({
                 actions: ['s3:*Object', 's3:ListBucket', 's3:GetBucketLocation'],
                 resources: ['arn:aws:s3:::cdktoolkit-stagingbucket-*'],
-            })
-        );
-
-        deployRole.addToPolicy(
-            iam.PolicyStatement.fromJson({
-                Effect: 'Allow',
-                Action: ['iam:PassRole'],
-                Resource: [props.dynamoDbExecutionRole.roleArn],
-            })
-        );
-
-        deployRole.addToPolicy(
-            iam.PolicyStatement.fromJson({
-                Effect: 'Allow',
-                Action: ['iam:PassRole'],
-                Resource: [props.ecrExecutionRole.roleArn],
             })
         );
 
