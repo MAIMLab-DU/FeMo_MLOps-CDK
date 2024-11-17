@@ -243,7 +243,7 @@ export class CodePipelineConstruct extends Construct {
                 },
                 IMAGE_URI: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: `${props.ecrRepo.repositoryUri}:latest`,
+                    value: props.ecrRepo.repositoryUri,
                 },
                 DYNAMODB_TABLE: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
