@@ -52,7 +52,6 @@ export class CodePipelineConstruct extends Construct {
 
         this.pipeline = new codepipeline.Pipeline(this, 'MLOpsPipeline', {
             pipelineType: codepipeline.PipelineType.V2,
-            restartExecutionOnUpdate: true,
         });
 
         const sourceMLCodeOutput = new codepipeline.Artifact('SourceMLCodeOutput');
@@ -137,13 +136,15 @@ export class CodePipelineConstruct extends Construct {
 
         buildProject.addToRolePolicy(
             new iam.PolicyStatement({
-                actions: [
-                    'ecr:GetDownloadUrlForLayer',
-                    'ecr:BatchGetImage',
-                    'ecr:BatchCheckLayerAvailability',
-                    'ecr:PutImage',
-                ],
+                actions: ['ecr:*'],
                 resources: [props.ecrRepo.repositoryArn, `${props.ecrRepo.repositoryArn}/*`],
+            })
+        );
+
+        buildProject.addToRolePolicy(
+            new iam.PolicyStatement({
+                actions: ['codepipeline:ListPipelineExecutions'],
+                resources: [`arn:aws:codepipeline:${Stack.of(this).region}:${Stack.of(this).account}:*`],
             })
         );
 
@@ -407,6 +408,14 @@ export class CodePipelineConstruct extends Construct {
             new iam.PolicyStatement({
                 actions: ['sts:AssumeRole', 'iam:PassRole'],
                 resources: [`arn:aws:iam::${Stack.of(this).account}:role/cdk*`],
+            })
+        );
+
+        deployRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: ['dynamodb:*'],
+                Resource: [props.dynamoDbTable.tableArn, `${props.dynamoDbTable.tableArn}/*`],
             })
         );
 

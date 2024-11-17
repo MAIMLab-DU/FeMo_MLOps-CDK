@@ -4,13 +4,10 @@ import { Construct } from 'constructs';
 import { CodePipelineConstruct, CodePipelineConstructPropsBase } from './codePipelineConstruct';
 import { DataSourceConstruct, DataSourceConstructProps } from './dataSourceConstruct';
 import { DynamoDBConstruct } from './dynamoDbConstruct';
-import { EcrConstruct, EcrConstructProps } from './ecrRepositoryConstruct';
+import { EcrConstruct } from './ecrRepositoryConstruct';
 import { SageMakerConstruct } from './sageMakerConstruct';
 
-export type InfrastractureStackProps = CodePipelineConstructPropsBase &
-    StackProps &
-    DataSourceConstructProps &
-    EcrConstructProps;
+export type InfrastractureStackProps = CodePipelineConstructPropsBase & StackProps & DataSourceConstructProps;
 
 export class InfrastractureStack extends Stack {
     constructor(scope: Construct, id: string, props: InfrastractureStackProps) {
@@ -20,12 +17,8 @@ export class InfrastractureStack extends Stack {
             ...props,
         });
 
-        const dynamodb = new DynamoDBConstruct(this, 'DynamoDbConstruct', {
-            tableName: `${this.stackName}-inferenceJobResults`,
-        });
-        const ecrRepos = new EcrConstruct(this, 'EcrRepositoryConstruct', {
-            repositoryName: `${props.projectName.toLowerCase()}/${props.repositoryName.toLowerCase()}`,
-        });
+        const dynamodb = new DynamoDBConstruct(this, 'DynamoDbConstruct');
+        const ecrRepos = new EcrConstruct(this, 'EcrRepositoryConstruct');
 
         const sageMaker = new SageMakerConstruct(this, 'SageMakerConstruct', {
             dataBucket: dataSource.dataBucket,
@@ -57,11 +50,6 @@ export class InfrastractureStack extends Stack {
         new CfnOutput(this, 'DynamoDbOutput', {
             value: dynamodb.dynamoDBTable.tableArn,
             exportName: 'FeMo-DynamoDbInferenceResults',
-        });
-
-        new CfnOutput(this, 'DynamoDbExecutionRoleOutput', {
-            value: dynamodb.dynamoDBExecutionRole.roleArn,
-            exportName: 'FeMo-DynamoDbExecutionRole',
         });
 
         new CfnOutput(this, 'EcrRepositoryOutput', {
