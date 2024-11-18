@@ -1,4 +1,3 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 import { Construct } from 'constructs';
 import { Stack, StackProps, CfnParameter, CustomResource, CfnOutput, Duration } from 'aws-cdk-lib';
@@ -12,6 +11,8 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 
 export interface ModelDeploymentStackProps extends StackProps {
     modelEndpointExportNamePrefix: string;
+    endpointInstanceType?: string;
+    endpointInstanceCount?: number;
     projectName: string;
 }
 
@@ -23,21 +24,17 @@ export class ModelDeploymentStack extends Stack {
             type: 'String',
         });
 
-        const endpointInstanceType = new CfnParameter(this, 'endpointInstanceType', {
-            type: 'String',
-            default: 'ml.t2.medium',
-        });
-
-        const endpointInstanceCount = new CfnParameter(this, 'endpointInstanceCount', {
-            type: 'Number',
-            default: 1,
-            minValue: 1,
-        });
-
         const executionRole = new iam.Role(this, 'SageMakerModelExecutionRole', {
             assumedBy: new iam.ServicePrincipal('sagemaker.amazonaws.com'),
             managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSageMakerFullAccess')],
         });
+        executionRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: ['s3:CreateBucket', 's3:GetObject', 's3:PutObject', 's3:ListBucket'],
+                Resource: ['*'],
+            })
+        );
 
         const pipelineModelFunctionRole = new iam.Role(this, 'DataFunctionRole', {
             assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
@@ -103,9 +100,9 @@ export class ModelDeploymentStack extends Stack {
         const endpointConfig = new sagemaker.CfnEndpointConfig(this, 'SageMakerModelEndpointConfig', {
             productionVariants: [
                 {
-                    initialInstanceCount: endpointInstanceCount.valueAsNumber,
+                    initialInstanceCount: props.endpointInstanceCount || 1,
                     initialVariantWeight: 1.0,
-                    instanceType: endpointInstanceType.valueAsString,
+                    instanceType: props.endpointInstanceType || 'ml.c5.xlarge',
                     modelName: pipelineModelCustomResource.ref,
                     variantName: 'AllTraffic',
                 },
