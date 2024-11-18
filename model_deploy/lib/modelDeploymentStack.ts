@@ -28,11 +28,20 @@ export class ModelDeploymentStack extends Stack {
             assumedBy: new iam.ServicePrincipal('sagemaker.amazonaws.com'),
             managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSageMakerFullAccess')],
         });
+
         executionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
-                Action: ['s3:CreateBucket', 's3:GetObject', 's3:PutObject', 's3:ListBucket'],
-                Resource: ['*'],
+                Action: ['s3:GetObject', 's3:ListBucket'],
+                Resource: [process.env.SM_ARTIFACT_BUCKET_ARN, `${process.env.SM_ARTIFACT_BUCKET_ARN}/*`],
+            })
+        );
+
+        executionRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: ['dynamodb:*'],
+                Resource: [process.env.DYNAMODB_TABLE_ARN, `${process.env.DYNAMODB_TABLE_ARN}/*`],
             })
         );
 

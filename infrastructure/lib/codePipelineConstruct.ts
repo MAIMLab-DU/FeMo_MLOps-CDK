@@ -412,6 +412,16 @@ export class CodePipelineConstruct extends Construct {
             project: deployProject,
             input: buildOutputCDK,
             extraInputs: [pipelineOutput],
+            environmentVariables: {
+                SM_ARTIFACT_BUCKET_ARN: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: props.sageMakerArtifactBucket.bucketArn,
+                },
+                DYNAMODB_TABLE_ARN: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: props.dynamoDbTable.tableArn,
+                },
+            },
         });
 
         this.pipeline.addStage({
