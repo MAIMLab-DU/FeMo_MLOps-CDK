@@ -5,7 +5,6 @@ import * as path from 'path';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as sagemaker from 'aws-cdk-lib/aws-sagemaker';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as lambdaNodeJs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as customResource from 'aws-cdk-lib/custom-resources';
 import * as logs from 'aws-cdk-lib/aws-logs';
 
@@ -40,17 +39,17 @@ export class ModelDeploymentStack extends Stack {
         executionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
-                Action: ['dynamodb:*'],
+                Action: ['dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:GetItem'],
                 Resource: [process.env.DYNAMODB_TABLE_ARN, `${process.env.DYNAMODB_TABLE_ARN}/*`],
             })
         );
 
-        const pipelineModelFunctionRole = new iam.Role(this, 'DataFunctionRole', {
+        const inferenceModelFunctionRole = new iam.Role(this, 'InferenceModelFunctionRole', {
             assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
             managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole')],
         });
 
-        pipelineModelFunctionRole.addToPolicy(
+        inferenceModelFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: ['sagemaker:CreateModel', 'sagemaker:DeleteModel', 'sagemaker:DescribeModelPackage'],
@@ -61,7 +60,7 @@ export class ModelDeploymentStack extends Stack {
             })
         );
 
-        pipelineModelFunctionRole.addToPolicy(
+        inferenceModelFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: ['iam:PassRole'],
@@ -69,34 +68,30 @@ export class ModelDeploymentStack extends Stack {
             })
         );
 
-        // Define the Lambda Layer
-        const PipelineModelFunctionLayer = new lambda.LayerVersion(this, 'PipelineModelFunctionLayer', {
-            code: lambda.Code.fromAsset(path.join(__dirname, '../layers/PipelineModelFunctionLayer.zip')),
-            compatibleRuntimes: [lambda.Runtime.NODEJS_18_X],
-            description: 'A Lambda layer for common dependencies',
+        const inferenceModelFunction = new lambda.Function(this, 'InferenceModelFunction', {
+            runtime: lambda.Runtime.PYTHON_3_10, // Use Python 3.10 runtime
+            handler: 'lambda_function.lambda_handler', // Python handler defined as 'filename.function_name'
+            code: lambda.Code.fromAsset(path.join(__dirname, '../customResources/inferenceModel'), {
+                exclude: ['.venv', '.ruff_cache', '.pytest_cache', '*.pyc', '__pycache__'],
+            }),
+            timeout: Duration.minutes(2),
+            role: inferenceModelFunctionRole,
+            environment: {
+                DYNAMODB_TABLE: `${process.env.DYNAMODB_TABLE_NAME}`,
+            },
         });
 
-        // Define the Lambda Function with the Layer
-        const pipelineModelFunction = new lambdaNodeJs.NodejsFunction(this, 'PipelineModelFunction', {
-            runtime: lambda.Runtime.NODEJS_18_X,
-            handler: 'handler',
-            entry: path.join(__dirname, '../customResources/pipelineModel/index.ts'),
-            timeout: Duration.minutes(1),
-            role: pipelineModelFunctionRole,
-            layers: [PipelineModelFunctionLayer], // Add the layer here
-        });
-
-        const pipelineModelCustomResourceProvider = new customResource.Provider(
+        const inferenceModelCustomResourceProvider = new customResource.Provider(
             this,
-            'PipelineModelCustomResourceProvider',
+            'InferenceModelCustomResourceProvider',
             {
-                onEventHandler: pipelineModelFunction,
+                onEventHandler: inferenceModelFunction,
                 logRetention: logs.RetentionDays.ONE_DAY,
             }
         );
 
-        const pipelineModelCustomResource = new CustomResource(this, 'PipelineModelCustomResource', {
-            serviceToken: pipelineModelCustomResourceProvider.serviceToken,
+        const inferenceModelCustomResource = new CustomResource(this, 'InferenceModelCustomResource', {
+            serviceToken: inferenceModelCustomResourceProvider.serviceToken,
             properties: {
                 modelPackageName: modelPackageName.valueAsString,
                 sagemakerExecutionRole: executionRole.roleArn,
@@ -104,7 +99,7 @@ export class ModelDeploymentStack extends Stack {
             },
         });
 
-        pipelineModelCustomResource.node.addDependency(executionRole);
+        inferenceModelCustomResource.node.addDependency(executionRole);
 
         const endpointConfig = new sagemaker.CfnEndpointConfig(this, 'SageMakerModelEndpointConfig', {
             productionVariants: [
@@ -112,13 +107,13 @@ export class ModelDeploymentStack extends Stack {
                     initialInstanceCount: props.endpointInstanceCount || 1,
                     initialVariantWeight: 1.0,
                     instanceType: props.endpointInstanceType || 'ml.c5.xlarge',
-                    modelName: pipelineModelCustomResource.ref,
+                    modelName: inferenceModelCustomResource.ref,
                     variantName: 'AllTraffic',
                 },
             ],
         });
 
-        endpointConfig.node.addDependency(pipelineModelCustomResource);
+        endpointConfig.node.addDependency(inferenceModelCustomResource);
 
         const endpoint = new sagemaker.CfnEndpoint(this, 'SageMakerModelEndpoint', {
             endpointConfigName: endpointConfig.getAtt('EndpointConfigName').toString(),
