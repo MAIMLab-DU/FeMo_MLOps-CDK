@@ -5,12 +5,11 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as lambdaNodeJs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as path from 'path';
 
 export interface InferencApiConstructProps {
     readonly ipCIDRBlocks: string[];
-    readonly sageMakeEndpointARN: string;
+    readonly sageMakeEndpointArn: string;
     readonly sageMakerEndpointName: string;
     readonly inferenceResultTable: dynamodb.Table;
 }
@@ -24,13 +23,22 @@ export class InferenceApiConstruct extends Construct {
     constructor(scope: Construct, id: string, props: InferencApiConstructProps) {
         super(scope, id);
 
-        // const inferenceResultTable = new dynamodb.Table(this, 'InferenceResultTable', {
-        //     partitionKey: { name: 's3Key', type: dynamodb.AttributeType.STRING },
-        //     sortKey: { name: 'timeStamp', type: dynamodb.AttributeType.STRING },
-        //     billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-        //     encryption: dynamodb.TableEncryption.DEFAULT,
-        //     pointInTimeRecovery: true,
-        // });
+        const validationSchema: apigateway.JsonSchema = {
+            type: apigateway.JsonSchemaType.OBJECT,
+            properties: {
+                s3Key: {
+                    type: apigateway.JsonSchemaType.STRING,
+                    pattern: '^s3://.*\\.dat$', // Regex for s3Key validation
+                },
+                jobId: {
+                    type: apigateway.JsonSchemaType.STRING,
+                },
+                reEval: {
+                    type: apigateway.JsonSchemaType.BOOLEAN,
+                },
+            },
+            required: ['s3Key'], // Specify required properties
+        };
 
         const apigatewayPolicy = new iam.PolicyDocument({
             statements: [
@@ -63,21 +71,27 @@ export class InferenceApiConstruct extends Construct {
             restApiName: 'Inference API',
         });
 
+        const model = this.api.addModel('InferenceRequestModel', {
+            modelName: 'InferenceRequestModel',
+            schema: validationSchema,
+            contentType: 'application/json',
+        });
+
         this.api.latestDeployment?.addToLogicalId(Token.asAny(apigatewayPolicy));
 
-        this.api.addUsagePlan('InferenceAPIUsagePlan', {
-            name: 'InferenceAPIUsagePlan',
+        this.api.addUsagePlan('InferenceApiUsagePlan', {
+            name: 'InferenceApiUsagePlan',
             apiStages: [{ api: this.api, stage: this.api.deploymentStage }],
             throttle: { burstLimit: 500, rateLimit: 1000 },
             quota: { limit: 10000000, period: apigateway.Period.MONTH },
         });
 
-        const dataFunctionRole = new iam.Role(this, 'DataFunctionRole', {
+        const inferenceApiFunctionRole = new iam.Role(this, 'InferenceApiFunctionRole', {
             assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
             managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole')],
         });
 
-        dataFunctionRole.addToPolicy(
+        inferenceApiFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: ['dynamodb:UpdateItem', 'dynamodb:PutItem', 'dynamodb:GetItem'],
@@ -85,32 +99,38 @@ export class InferenceApiConstruct extends Construct {
             })
         );
 
-        dataFunctionRole.addToPolicy(
+        inferenceApiFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: ['sagemaker:InvokeEndpoint'],
-                Resource: [props.sageMakeEndpointARN],
+                Resource: [props.sageMakeEndpointArn],
             })
         );
 
-        const dataFunction = new lambdaNodeJs.NodejsFunction(this, 'DataFunction', {
-            runtime: lambda.Runtime.NODEJS_18_X,
-            handler: 'handler',
-            entry: path.join(__dirname, '../../data-api/src/index.ts'),
-            timeout: Duration.seconds(30),
-            role: dataFunctionRole,
+        const inferenceApiFunction = new lambda.Function(this, 'InferenceApiFunction', {
+            runtime: lambda.Runtime.PYTHON_3_10, // Use Python 3.10 runtime
+            handler: 'lambda_function.lambda_handler', // Python handler defined as 'filename.function_name'
+            code: lambda.Code.fromAsset(path.join(__dirname, '../functions/invokeInference'), {
+                exclude: ['.venv', '.ruff_cache', '.pytest_cache', '*.pyc', '__pycache__'],
+            }),
+            timeout: Duration.minutes(1),
+            role: inferenceApiFunctionRole,
             environment: {
                 SAGEMAKER_ENDPOINT_NAME: props.sageMakerEndpointName,
-                DATA_TABLE_NAME: props.inferenceResultTable.tableName,
+                DYNAMODB_TABLE_NAME: props.inferenceResultTable.tableName,
             },
         });
 
-        const dataIntegration = new apigateway.LambdaIntegration(dataFunction);
+        const inferenceIntegration = new apigateway.LambdaIntegration(inferenceApiFunction);
 
-        const dataEndpoint = this.api.root.addResource('data');
-        dataEndpoint.addMethod('POST', dataIntegration);
-
-        const dataFeedbackEndpoint = dataEndpoint.addResource('{id}');
-        dataFeedbackEndpoint.addMethod('POST', dataIntegration);
+        const inferenceEndpoint = this.api.root.addResource('inference');
+        inferenceEndpoint.addMethod('POST', inferenceIntegration, {
+            requestModels: {
+                'application/json': model,
+            },
+            requestValidatorOptions: {
+                validateRequestBody: true,
+            },
+        });
     }
 }

@@ -134,16 +134,16 @@ export class ModelDeploymentStack extends Stack {
 
         const apiConstruct = new InferenceApiConstruct(this, 'WebsiteAPIConstruct', {
             ipCIDRBlocks: props.ipPermitList,
-            sageMakeEndpointARN: endpoint.ref,
+            sageMakeEndpointArn: endpoint.ref,
             sageMakerEndpointName: endpoint.getAtt('EndpointName').toString(),
             inferenceResultTable: inferenceResultTable,
         });
 
-        apiConstruct.node.addDependency([inferenceResultTable, endpoint]);
+        apiConstruct.node.addDependency(endpoint);
 
         new CfnOutput(this, 'InferenceApiEndpointOutput', {
             value: apiConstruct.api.url,
-            exportName: `${props.modelEndpointExportNamePrefix}-${props.projectName}`,
+            exportName: `${props.projectName}-InferenceApiEndpoint`,
         });
     }
 }
