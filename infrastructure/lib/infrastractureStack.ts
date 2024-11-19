@@ -33,32 +33,32 @@ export class InfrastractureStack extends Stack {
 
         new CfnOutput(this, 'CodePipelineOutput', {
             value: codePipeline.pipeline.pipelineName,
-            exportName: 'FeMo-CodePipeline',
+            exportName: `${props.projectName}-CodePipeline`,
         });
 
         new CfnOutput(this, 'DataBucketOutput', {
             value: dataSource.dataBucket.bucketName,
-            exportName: 'FeMo-DataBucket',
+            exportName: `${props.projectName}-DataBucket`,
         });
 
         new CfnOutput(this, 'EcrRepositoryOutput', {
             value: ecrRepos.ecrRepository.repositoryArn,
-            exportName: 'FeMo-EcrRepository',
+            exportName: `${props.projectName}-EcrRepository`,
         });
 
         new CfnOutput(this, 'DataManifestBucketOutput', {
             value: dataSource.dataManifestBucket.bucketName,
-            exportName: 'FeMo-DataManifestBucket',
+            exportName: `${props.projectName}-DataManifestBucket`,
         });
 
         new CfnOutput(this, 'SageMakerArtifactBucketOutput', {
             value: sageMaker.sagemakerArtifactBucket.bucketName,
-            exportName: 'FeMo-SageMakerArtifactBucket',
+            exportName: `${props.projectName}-SageMakerArtifactBucket`,
         });
 
         new CfnOutput(this, 'SageMakerExecutionRoleOutput', {
             value: sageMaker.sagemakerExecutionRole.roleArn,
-            exportName: 'FeMo-SageMakerExecutionRole',
+            exportName: `${props.projectName}-SageMakerExecutionRole`,
         });
     }
 }
