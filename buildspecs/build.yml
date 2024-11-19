@@ -26,6 +26,7 @@ phases:
   build:
     commands:
       - bash scripts/ci.sh
+      - bash scripts/build_deploy.sh
       - bash scripts/docker_build_push.sh
       - bash scripts/copy_data_manifest.sh
 
