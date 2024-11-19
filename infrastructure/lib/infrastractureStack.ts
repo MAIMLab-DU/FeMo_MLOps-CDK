@@ -47,12 +47,12 @@ export class InfrastractureStack extends Stack {
         });
 
         new CfnOutput(this, 'DataManifestBucketOutput', {
-            value: dataSource.dataManifestBucket.bucketName,
+            value: dataSource.dataManifestBucket.bucketArn,
             exportName: `${props.projectName}-DataManifestBucket`,
         });
 
         new CfnOutput(this, 'SageMakerArtifactBucketOutput', {
-            value: sageMaker.sagemakerArtifactBucket.bucketName,
+            value: sageMaker.sagemakerArtifactBucket.bucketArn,
             exportName: `${props.projectName}-SageMakerArtifactBucket`,
         });
 
