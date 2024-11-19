@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT-0
 import { Construct } from 'constructs';
-import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 
 export interface SageMakerConstructProps {
     readonly dataBucket: s3.IBucket;
-    readonly dynamoDbTable: dynamodb.Table;
 }
 
 /**
@@ -48,14 +46,6 @@ export class SageMakerConstruct extends Construct {
                 Effect: 'Allow',
                 Action: ['s3:GetObject', 's3:PutObject', 's3:ListBucket'],
                 Resource: [this.sagemakerArtifactBucket.bucketArn, `${this.sagemakerArtifactBucket.bucketArn}/*`],
-            })
-        );
-
-        this.sagemakerExecutionRole.addToPolicy(
-            iam.PolicyStatement.fromJson({
-                Effect: 'Allow',
-                Action: ['dynamodb:*'],
-                Resource: [props.dynamoDbTable.tableArn, `${props.dynamoDbTable.tableArn}/*`],
             })
         );
     }

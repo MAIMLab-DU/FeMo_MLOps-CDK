@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT-0
 import { Stack } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -17,7 +16,6 @@ export type CodePipelineConstructPropsBase = {
 
 export type CodePipelineConstructProps = {
     readonly dataManifestBucket: s3.Bucket;
-    readonly dynamoDbTable: dynamodb.Table;
     readonly ecrRepo: ecr.Repository;
     readonly sageMakerArtifactBucket: s3.Bucket;
     readonly sageMakerExecutionRole: iam.Role;
@@ -257,10 +255,6 @@ export class CodePipelineConstruct extends Construct {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: props.ecrRepo.repositoryUri,
                 },
-                DYNAMODB_TABLE: {
-                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: props.dynamoDbTable.tableName,
-                },
                 FORCE_EXTRACT_FEATURES: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: props.sageMakerForceExtractFeatures,
@@ -389,14 +383,6 @@ export class CodePipelineConstruct extends Construct {
             })
         );
 
-        deployRole.addToPolicy(
-            iam.PolicyStatement.fromJson({
-                Effect: 'Allow',
-                Action: ['dynamodb:*'],
-                Resource: [props.dynamoDbTable.tableArn, `${props.dynamoDbTable.tableArn}/*`],
-            })
-        );
-
         const deployProject = new codebuild.PipelineProject(this, 'DeployProject', {
             buildSpec: codebuild.BuildSpec.fromSourceFilename('./buildspecs/deploy.yml'),
             role: deployRole,
@@ -412,16 +398,6 @@ export class CodePipelineConstruct extends Construct {
             project: deployProject,
             input: buildOutputCDK,
             extraInputs: [pipelineOutput],
-            environmentVariables: {
-                SM_ARTIFACT_BUCKET_ARN: {
-                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: props.sageMakerArtifactBucket.bucketArn,
-                },
-                DYNAMODB_TABLE_ARN: {
-                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: props.dynamoDbTable.tableArn,
-                },
-            },
         });
 
         this.pipeline.addStage({
