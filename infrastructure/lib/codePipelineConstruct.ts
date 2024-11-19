@@ -29,12 +29,14 @@ export interface CodePipelineConstructPropsGithubSource {
         readonly githubRepoOwner: string;
         readonly githubRepoName: string;
         readonly githubRepoBranch?: string;
+        readonly triggerOnPush?: boolean;
     };
     readonly gitCDK: {
         readonly githubConnectionArn: string;
         readonly githubRepoOwner: string;
         readonly githubRepoName: string;
         readonly githubRepoBranch?: string;
+        readonly triggerOnPush?: boolean;
     };
 }
 
@@ -65,7 +67,7 @@ export class CodePipelineConstruct extends Construct {
             repo: props.gitML.githubRepoName,
             branch: props.gitML.githubRepoBranch || 'main',
             connectionArn: props.gitML.githubConnectionArn,
-            triggerOnPush: false,
+            triggerOnPush: props.gitML.triggerOnPush || false,
         });
         const sourceCDKCode = new codepipeline_actions.CodeStarConnectionsSourceAction({
             actionName: 'SourceCDKCode',
@@ -74,7 +76,7 @@ export class CodePipelineConstruct extends Construct {
             repo: props.gitCDK.githubRepoName,
             branch: props.gitCDK.githubRepoBranch || 'main',
             connectionArn: props.gitCDK.githubConnectionArn,
-            triggerOnPush: false,
+            triggerOnPush: props.gitCDK.triggerOnPush || false,
         });
 
         //Source Data
@@ -285,7 +287,7 @@ export class CodePipelineConstruct extends Construct {
 
         //Deploy
         const deploymentApprovalTopic = new sns.Topic(this, 'ModelDeploymentApprovalTopic', {
-            topicName: 'ModelDeploymentApprovalTopic',
+            topicName: `${props.projectName}-ModelDeploymentApprovalTopic`,
         });
 
         const manualApprovalAction = new codepipeline_actions.ManualApprovalAction({
