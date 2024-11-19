@@ -6,11 +6,11 @@ set -e
 
 pushd model_deploy
 
-# TODO: python
-pushd ./customResources/pipelineModel
-yarn install --frozen-lockfile
-popd
-zip -r -q layers/PipelineModelFunctionLayer.zip layers/PipelineModelFunctionLayer/
+python3 -m venv .venv
+source .venv/bin/activate
+pip install ruff==0.6.4
+ruff check ***/**/*.py
+deactivate
 
 yarn install --frozen-lockfile
 yarn lint
