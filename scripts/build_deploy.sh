@@ -6,6 +6,7 @@ set -e
 
 pushd model_deploy
 
+# TODO: python
 pushd ./customResources/pipelineModel
 yarn install --frozen-lockfile
 popd

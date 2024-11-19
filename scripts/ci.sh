@@ -37,7 +37,6 @@ pushd ./infrastructure
 pushd ./functions/dataSourceMonitor
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
 pip install ruff==0.6.4
 ruff check *.py
 deactivate
