@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT-0
 import { Construct } from 'constructs';
-import { Stack, StackProps, CfnParameter, CustomResource, CfnOutput, Duration } from 'aws-cdk-lib';
+import { Fn, Stack, StackProps, CfnParameter, CustomResource, CfnOutput, Duration } from 'aws-cdk-lib';
+import { InferenceApiConstruct } from './inferenceApiConstruct';
 import * as path from 'path';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as sagemaker from 'aws-cdk-lib/aws-sagemaker';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as customResource from 'aws-cdk-lib/custom-resources';
@@ -12,12 +14,23 @@ export interface ModelDeploymentStackProps extends StackProps {
     modelEndpointExportNamePrefix: string;
     endpointInstanceType?: string;
     endpointInstanceCount?: number;
+    ipPermitList: string[];
     projectName: string;
 }
 
 export class ModelDeploymentStack extends Stack {
     constructor(scope: Construct, id: string, props: ModelDeploymentStackProps) {
         super(scope, id, props);
+
+        const sagemakerArtifactBucketArn = Fn.importValue(`${props.projectName}-SagemakerArtifactBucket`);
+
+        const inferenceResultTable = new dynamodb.Table(this, 'InferenceResultTable', {
+            partitionKey: { name: 's3Key', type: dynamodb.AttributeType.STRING },
+            sortKey: { name: 'timeStamp', type: dynamodb.AttributeType.STRING },
+            billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+            encryption: dynamodb.TableEncryption.DEFAULT,
+            pointInTimeRecovery: true,
+        });
 
         const modelPackageName = new CfnParameter(this, 'modelPackageName', {
             type: 'String',
@@ -32,7 +45,7 @@ export class ModelDeploymentStack extends Stack {
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: ['s3:GetObject', 's3:ListBucket'],
-                Resource: [process.env.SM_ARTIFACT_BUCKET_ARN, `${process.env.SM_ARTIFACT_BUCKET_ARN}/*`],
+                Resource: [sagemakerArtifactBucketArn, `${sagemakerArtifactBucketArn}/*`],
             })
         );
 
@@ -40,7 +53,7 @@ export class ModelDeploymentStack extends Stack {
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: ['dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:GetItem'],
-                Resource: [process.env.DYNAMODB_TABLE_ARN, `${process.env.DYNAMODB_TABLE_ARN}/*`],
+                Resource: [inferenceResultTable.tableArn, `${inferenceResultTable.tableArn}/*`],
             })
         );
 
@@ -77,7 +90,7 @@ export class ModelDeploymentStack extends Stack {
             timeout: Duration.minutes(2),
             role: inferenceModelFunctionRole,
             environment: {
-                DYNAMODB_TABLE: `${process.env.DYNAMODB_TABLE_NAME}`,
+                DYNAMODB_TABLE: inferenceResultTable.tableName,
             },
         });
 
@@ -96,6 +109,7 @@ export class ModelDeploymentStack extends Stack {
                 modelPackageName: modelPackageName.valueAsString,
                 sagemakerExecutionRole: executionRole.roleArn,
                 projectName: props.projectName,
+                inferenceResultTable: inferenceResultTable.tableName,
             },
         });
 
@@ -121,14 +135,18 @@ export class ModelDeploymentStack extends Stack {
 
         endpoint.node.addDependency(endpointConfig);
 
-        new CfnOutput(this, 'ModelEndpointOutput', {
-            value: endpoint.ref,
-            exportName: `${props.modelEndpointExportNamePrefix}-${props.projectName}`,
+        const apiConstruct = new InferenceApiConstruct(this, 'WebsiteAPIConstruct', {
+            ipCIDRBlocks: props.ipPermitList,
+            sageMakeEndpointARN: endpoint.ref,
+            sageMakerEndpointName: endpoint.getAtt('EndpointName').toString(),
+            inferenceResultTable: inferenceResultTable,
         });
 
-        new CfnOutput(this, 'ModelEndpointNameOutput', {
-            value: endpoint.getAtt('EndpointName').toString(),
-            exportName: `${props.modelEndpointExportNamePrefix}-Name-${props.projectName}`,
+        apiConstruct.node.addDependency([inferenceResultTable, endpoint]);
+
+        new CfnOutput(this, 'InferenceApiEndpointOutput', {
+            value: apiConstruct.api.url,
+            exportName: `${props.modelEndpointExportNamePrefix}-${props.projectName}`,
         });
     }
 }
