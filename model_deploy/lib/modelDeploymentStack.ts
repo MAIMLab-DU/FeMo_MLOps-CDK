@@ -89,9 +89,6 @@ export class ModelDeploymentStack extends Stack {
             }),
             timeout: Duration.minutes(2),
             role: inferenceModelFunctionRole,
-            environment: {
-                DYNAMODB_TABLE: inferenceResultTable.tableName,
-            },
         });
 
         const inferenceModelCustomResourceProvider = new customResource.Provider(

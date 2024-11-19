@@ -5,7 +5,7 @@ import json
 
 sagemaker = boto3.client('sagemaker', region_name=os.environ['AWS_REGION'])
 
-def create_model(project_name, model_package_name, execution_role_arn):
+def create_model(project_name, model_package_name, dyanmodb_table_name, execution_role_arn):
     now = datetime.datetime.now(datetime.timezone.utc)
     model_name = f"{project_name}-{now.year}-{now.month}-{now.day}-{now.hour}-{now.minute}-{now.second}-{now.microsecond}"
     print(f"Creating model {model_name} for modelPackageName: {model_package_name} with role {execution_role_arn}")
@@ -14,7 +14,7 @@ def create_model(project_name, model_package_name, execution_role_arn):
         ModelPackageName=model_package_name
     )
     additional_environment = {
-        "DYNAMODB_TABLE_NAME": os.getenv('DYNAMODB_TABLE_NAME')
+        "DYNAMODB_TABLE": dyanmodb_table_name
     }
 
     containers = [
@@ -55,7 +55,8 @@ def dispatch(event, request_type):
         return create_model(
             props["projectName"],
             props["modelPackageName"],
-            props["sagemakerExecutionRole"]
+            props["sagemakerExecutionRole"],
+            props["inferenceResultTable"]
         )
     elif request_type == "Delete":
         return delete_model(resource_id)
