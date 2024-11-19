@@ -132,7 +132,7 @@ export class ModelDeploymentStack extends Stack {
 
         endpoint.node.addDependency(endpointConfig);
 
-        const apiConstruct = new InferenceApiConstruct(this, 'WebsiteAPIConstruct', {
+        const apiConstruct = new InferenceApiConstruct(this, 'InferenceAPIConstruct', {
             ipCIDRBlocks: props.ipPermitList,
             sageMakeEndpointArn: endpoint.ref,
             sageMakerEndpointName: endpoint.getAtt('EndpointName').toString(),
