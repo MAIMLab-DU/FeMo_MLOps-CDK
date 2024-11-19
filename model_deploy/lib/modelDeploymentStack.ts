@@ -22,7 +22,7 @@ export class ModelDeploymentStack extends Stack {
     constructor(scope: Construct, id: string, props: ModelDeploymentStackProps) {
         super(scope, id, props);
 
-        const sagemakerArtifactBucketArn = Fn.importValue(`${props.projectName}-SagemakerArtifactBucket`);
+        const sagemakerArtifactBucketArn = Fn.importValue(`${props.projectName}-SageMakerArtifactBucket`);
 
         const inferenceResultTable = new dynamodb.Table(this, 'InferenceResultTable', {
             partitionKey: { name: 's3Key', type: dynamodb.AttributeType.STRING },
