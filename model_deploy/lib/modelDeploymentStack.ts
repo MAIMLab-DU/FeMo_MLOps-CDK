@@ -16,6 +16,8 @@ export interface ModelDeploymentStackProps extends StackProps {
     endpointInstanceCount?: number;
     ipPermitList: string[];
     projectName: string;
+    customDomainName?: string;
+    acmCertificateArn?: string;
 }
 
 export class ModelDeploymentStack extends Stack {
@@ -142,6 +144,8 @@ export class ModelDeploymentStack extends Stack {
             sageMakeEndpointArn: endpoint.ref,
             sageMakerEndpointName: endpoint.getAtt('EndpointName').toString(),
             inferenceResultTable: inferenceResultTable,
+            customDomainName: props.customDomainName,
+            acmCertificateArn: props.acmCertificateArn,
         });
 
         apiConstruct.node.addDependency(endpoint);

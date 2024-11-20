@@ -5,6 +5,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
 import * as path from 'path';
 
 export interface InferencApiConstructProps {
@@ -12,6 +13,8 @@ export interface InferencApiConstructProps {
     readonly sageMakeEndpointArn: string;
     readonly sageMakerEndpointName: string;
     readonly inferenceResultTable: dynamodb.Table;
+    readonly customDomainName?: string; // Optional custom domain name
+    readonly acmCertificateArn?: string; // Optional ACM certificate ARN
 }
 
 /**
@@ -68,7 +71,6 @@ export class InferenceApiConstruct extends Construct {
                 allowMethods: apigateway.Cors.ALL_METHODS,
             },
             policy: apigatewayPolicy,
-            restApiName: 'Inference API',
         });
 
         const model = this.api.addModel('InferenceRequestModel', {
@@ -76,6 +78,26 @@ export class InferenceApiConstruct extends Construct {
             schema: validationSchema,
             contentType: 'application/json',
         });
+
+        // Optional Custom Domain Configuration
+        if (props.customDomainName && props.acmCertificateArn) {
+            const certificate = certificatemanager.Certificate.fromCertificateArn(
+                this,
+                'ACMCertificate',
+                props.acmCertificateArn
+            );
+
+            const customDomain = new apigateway.DomainName(this, 'InferenceApiCustomDomain', {
+                domainName: props.customDomainName,
+                certificate,
+            });
+
+            // Map custom domain to the API Gateway
+            customDomain.addBasePathMapping(this.api, {
+                basePath: '', // Use root as the base path
+                stage: this.api.deploymentStage,
+            });
+        }
 
         this.api.latestDeployment?.addToLogicalId(Token.asAny(apigatewayPolicy));
 
