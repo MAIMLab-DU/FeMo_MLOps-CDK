@@ -373,6 +373,13 @@ export class CodePipelineConstruct extends Construct {
 
         deployRole.addToPolicy(
             new iam.PolicyStatement({
+                actions: ['route53:ListHostedZonesByName'],
+                resources: ['*'],
+            })
+        );
+
+        deployRole.addToPolicy(
+            new iam.PolicyStatement({
                 actions: ['ssm:GetParameter'],
                 resources: [`arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/cdk-bootstrap/*`],
             })
