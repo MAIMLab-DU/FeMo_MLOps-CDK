@@ -39,9 +39,6 @@ export class InferenceApiConstruct extends Construct {
                 reEval: {
                     type: apigateway.JsonSchemaType.BOOLEAN,
                 },
-                // jobId: {
-                //     type: apigateway.JsonSchemaType.STRING,
-                // },
             },
             required: ['s3Key'], // Specify required properties
             additionalProperties: false,

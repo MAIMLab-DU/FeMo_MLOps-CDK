@@ -407,6 +407,16 @@ export class CodePipelineConstruct extends Construct {
             project: deployProject,
             input: buildOutputCDK,
             extraInputs: [pipelineOutput],
+            environmentVariables: {
+                CDK_DEFAULT_ACCOUNT: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: Stack.of(this).account,
+                },
+                CDK_DEFAULT_REGION: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: Stack.of(this).region,
+                },
+            },
         });
 
         this.pipeline.addStage({
