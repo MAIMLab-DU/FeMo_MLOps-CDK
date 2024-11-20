@@ -36,14 +36,15 @@ export class InferenceApiConstruct extends Construct {
                     type: apigateway.JsonSchemaType.STRING,
                     pattern: '^s3://.*\\.dat$', // Regex for s3Key validation
                 },
-                jobId: {
-                    type: apigateway.JsonSchemaType.STRING,
-                },
                 reEval: {
                     type: apigateway.JsonSchemaType.BOOLEAN,
                 },
+                // jobId: {
+                //     type: apigateway.JsonSchemaType.STRING,
+                // },
             },
             required: ['s3Key'], // Specify required properties
+            additionalProperties: false,
         };
 
         const apigatewayPolicy = new iam.PolicyDocument({
@@ -74,7 +75,11 @@ export class InferenceApiConstruct extends Construct {
                 allowMethods: apigateway.Cors.ALL_METHODS,
             },
             policy: apigatewayPolicy,
-            deploy: false,
+            deployOptions: {
+                stageName: props.apiStage,
+                loggingLevel: apigateway.MethodLoggingLevel.INFO,
+                cachingEnabled: true,
+            },
         });
 
         const model = this.api.addModel('InferenceRequestModel', {
@@ -130,6 +135,38 @@ export class InferenceApiConstruct extends Construct {
             requestValidatorOptions: {
                 validateRequestBody: true,
             },
+            methodResponses: [
+                {
+                    statusCode: '200',
+                    responseModels: {
+                        'application/json': apigateway.Model.EMPTY_MODEL,
+                    },
+                },
+                {
+                    statusCode: '202',
+                    responseModels: {
+                        'application/json': apigateway.Model.EMPTY_MODEL,
+                    },
+                },
+                {
+                    statusCode: '400',
+                    responseModels: {
+                        'application/json': apigateway.Model.ERROR_MODEL,
+                    },
+                },
+                {
+                    statusCode: '405',
+                    responseModels: {
+                        'application/json': apigateway.Model.ERROR_MODEL,
+                    },
+                },
+                {
+                    statusCode: '500',
+                    responseModels: {
+                        'application/json': apigateway.Model.ERROR_MODEL,
+                    },
+                },
+            ],
         });
 
         // GET Method with Query Parameter Validation
@@ -151,22 +188,12 @@ export class InferenceApiConstruct extends Construct {
                 {
                     statusCode: '400',
                     responseModels: {
-                        'application/json': apigateway.Model.EMPTY_MODEL,
+                        'application/json': apigateway.Model.ERROR_MODEL,
                     },
                 },
             ],
         });
 
-        const deployment = new apigateway.Deployment(this, 'InferenceApiDeployment', {
-            api: this.api,
-        });
-
-        const stage = new apigateway.Stage(this, `InferenceApiDeploymentStage${props.apiStage}`, {
-            deployment,
-            stageName: props.apiStage,
-        });
-
-        this.api.deploymentStage = stage;
         this.api.latestDeployment?.addToLogicalId(Token.asAny(apigatewayPolicy));
 
         this.api.addUsagePlan('InferenceApiUsagePlan', {

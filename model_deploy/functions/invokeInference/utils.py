@@ -10,7 +10,6 @@ from dataclasses import dataclass, asdict
 @dataclass
 class RequestData:
     s3Key: str
-    jobId: Optional[str] = None
     reEval: Optional[bool] = None
 
     def __post_init__(self):
@@ -20,9 +19,6 @@ class RequestData:
         # Validate field types
         if not isinstance(self.s3Key, str):
             raise ValueError(f"'s3Key' must be a string, got {type(self.s3Key).__name__}")
-        
-        if self.jobId is not None and not isinstance(self.jobId, str):
-            raise ValueError(f"'jobId' must be a string, got {type(self.jobId).__name__}")
         
         if self.reEval is not None and not isinstance(self.reEval, bool):
             raise ValueError(f"'reEval' must be a boolean, got {type(self.reEval).__name__}")
@@ -92,7 +88,7 @@ def process_response(item, status_code=None):
     """
     status = item.get('status')
     message_map = {
-        "InProgress": ("Inference job still in progress.", 204),
+        "InProgress": ("Inference job still in progress.", 202),
         "Completed": ("Inference job completed.", 200)
     }
     message, status_code = message_map.get(status, ("Inference job failed.", 400)) if not status_code else (message_map.get(status)[0], status_code)
@@ -117,7 +113,7 @@ def process_response(item, status_code=None):
     
     return {
         "statusCode": status_code,
-        "body": json.dumps(body)
+        "body": json.dumps(body, indent=2)
     }
 
 

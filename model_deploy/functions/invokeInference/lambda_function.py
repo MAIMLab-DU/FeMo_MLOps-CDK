@@ -39,10 +39,13 @@ def lambda_handler(event, context):
             body=json.loads(event["body"]) if "body" in event and event["body"] else None,
             query_params=event.get("queryStringParameters", {})
         )
+        # To ensure body is returned as JSON in response
+        body = response.get("body", {})
+        body = body if isinstance(body, str) else json.dumps(body, indent=2)
         return {
             "statusCode": response.get("statusCode", 200),
             "headers": cors_header,
-            "body": json.dumps(response.get("body", {})),
+            "body": body,
         }
 
     except Exception as e:
