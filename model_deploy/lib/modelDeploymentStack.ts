@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT-0
 import { Construct } from 'constructs';
-import { Fn, Stack, StackProps, CfnParameter, CustomResource, CfnOutput, Duration } from 'aws-cdk-lib';
+import {Stack, StackProps, CfnParameter, CustomResource, Duration } from 'aws-cdk-lib';
 import { InferenceApiConstruct } from './inferenceApiConstruct';
 import * as path from 'path';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -21,8 +21,6 @@ export interface ModelDeploymentStackProps extends StackProps {
 export class ModelDeploymentStack extends Stack {
     constructor(scope: Construct, id: string, props: ModelDeploymentStackProps) {
         super(scope, id, props);
-
-        const sagemakerArtifactBucketArn = Fn.importValue(`${props.projectName}-SageMakerArtifactBucket`);
 
         const inferenceResultTable = new dynamodb.Table(this, 'InferenceResultTable', {
             partitionKey: { name: 's3Key', type: dynamodb.AttributeType.STRING },
@@ -45,14 +43,14 @@ export class ModelDeploymentStack extends Stack {
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: ['s3:GetObject', 's3:ListBucket'],
-                Resource: [sagemakerArtifactBucketArn, `${sagemakerArtifactBucketArn}/*`],
+                Resource: ['*'],
             })
         );
 
         executionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
-                Action: ['dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:GetItem'],
+                Action: ['dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:GetItem', 'dynamodb:Query*'],
                 Resource: [inferenceResultTable.tableArn, `${inferenceResultTable.tableArn}/*`],
             })
         );
@@ -140,10 +138,5 @@ export class ModelDeploymentStack extends Stack {
         });
 
         apiConstruct.node.addDependency(endpoint);
-
-        new CfnOutput(this, 'InferenceApiEndpointOutput', {
-            value: apiConstruct.api.url,
-            exportName: `${props.projectName}-InferenceApiEndpoint`,
-        });
     }
 }

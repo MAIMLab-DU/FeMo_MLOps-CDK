@@ -94,8 +94,8 @@ export class InferenceApiConstruct extends Construct {
         inferenceApiFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
-                Action: ['dynamodb:UpdateItem', 'dynamodb:PutItem', 'dynamodb:GetItem'],
-                Resource: [props.inferenceResultTable.tableArn],
+                Action: ['dynamodb:UpdateItem', 'dynamodb:PutItem', 'dynamodb:GetItem', 'dynamodb:Query*'],
+                Resource: [props.inferenceResultTable.tableArn, `${props.inferenceResultTable.tableArn}/*`],
             })
         );
 

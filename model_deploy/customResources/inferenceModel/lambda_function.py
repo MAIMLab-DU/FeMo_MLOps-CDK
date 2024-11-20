@@ -55,8 +55,8 @@ def dispatch(event, request_type):
         return create_model(
             props["projectName"],
             props["modelPackageName"],
-            props["sagemakerExecutionRole"],
-            props["inferenceResultTable"]
+            props["inferenceResultTable"],
+            props["sagemakerExecutionRole"]
         )
     elif request_type == "Delete":
         return delete_model(resource_id)
