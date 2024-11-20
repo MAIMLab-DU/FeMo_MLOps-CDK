@@ -65,7 +65,8 @@ def query_table_with_keys(table, s3_key=None, job_id=None, limit=1):
         return table.query(
             KeyConditionExpression=Key('s3Key').eq(s3_key),
             ConsistentRead=True,
-            Limit=limit
+            Limit=limit,
+            ScanIndexForward=False  # Query in descending order (latest to oldest)
         )
     elif job_id:
         # Query using the GSI (jobId)
@@ -77,7 +78,7 @@ def query_table_with_keys(table, s3_key=None, job_id=None, limit=1):
     else:
         raise ValueError("Either 's3Key' or 'jobId' must be provided.")
 
-def process_response(item, data, status_code=None):
+def process_response(item, status_code=None):
     """
     Process a DynamoDB item response and return formatted response.
 
@@ -98,7 +99,7 @@ def process_response(item, data, status_code=None):
 
     body = {
         "message": message,
-        "s3Key": data.s3Key,
+        "s3Key": item.get('s3Key'),
         "timeStamp": item.get('timeStamp'),
         "jobId": item.get('jobId'),
         "result": item.get('result')
@@ -149,7 +150,7 @@ def get_inference(
             if 'Items' in response and response['Items']:
                 item = response['Items'][0]
                 if not data.reEval:
-                    return process_response(item, data)
+                    return process_response(item)
 
             # If no cached results, invoke SageMaker endpoint
             payload = asdict(data)
@@ -186,7 +187,7 @@ def get_inference(
             response = query_table_with_keys(table, None, job_id=job_id)
             if "Items" in response and response["Items"]:
                 item = response["Items"][0]
-                return process_response(item, data=None)
+                return process_response(item)
 
             return {
                 "statusCode": 404,
