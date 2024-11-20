@@ -3,8 +3,8 @@ import json
 import os
 from decimal import Decimal
 from datetime import datetime
-from boto3.dynamodb.conditions import Key, Attr
-from typing import Optional
+from boto3.dynamodb.conditions import Key
+from typing import Optional, Literal
 from dataclasses import dataclass, asdict
 
 @dataclass
@@ -47,30 +47,36 @@ def convert_decimals(obj):
         return obj
     
 
-def query_table_with_keys(table, s3_key, job_id=None, limit=1):
+def query_table_with_keys(table, s3_key=None, job_id=None, limit=1):
     """
     Query the DynamoDB table based on the provided keys.
 
     Args:
         table: DynamoDB table object.
-        s3_key: The s3Key to query.
+        s3_key: The s3Key to query (optional).
         job_id: The jobId to query (optional).
         limit: Number of items to limit the query to.
 
     Returns:
         dict: Query response.
     """
-    if job_id is not None:
+    if s3_key:
+        # Query using the primary key (partition key)
         return table.query(
             KeyConditionExpression=Key('s3Key').eq(s3_key),
-            FilterExpression=Attr('jobId').eq(job_id),
-            ConsistentRead=True
+            ConsistentRead=True,
+            Limit=limit
         )
-    return table.query(
-        KeyConditionExpression=Key('s3Key').eq(s3_key),
-        ScanIndexForward=False,
-        Limit=limit
-    )
+    elif job_id:
+        # Query using the GSI (jobId)
+        return table.query(
+            IndexName='JobIdIndex',  # Name of the GSI
+            KeyConditionExpression=Key('jobId').eq(job_id),
+            ConsistentRead=True,
+            Limit=limit
+        )
+    else:
+        raise ValueError("Either 's3Key' or 'jobId' must be provided.")
 
 def process_response(item, data, status_code=None):
     """
@@ -115,53 +121,87 @@ def process_response(item, data, status_code=None):
     }
 
 
-def get_inference(id: str, data: dict):
+def get_inference(
+    request_id: str,
+    method: Literal['POST', 'GET'],
+    body: Optional[dict] = None,
+    query_params: Optional[dict] = None
+):
+    """
+    Processes the inference logic based on the HTTP method.
 
-    data: RequestData = RequestData(**data)
-        
-    try:
-        response = query_table_with_keys(table, data.s3Key, job_id=data.jobId if data.jobId else None)
-        if data.jobId and 'Item' in response:
-            item = response['Item']
-            return process_response(item, data)
+    Args:
+        request_id: AWS request ID for tracing.
+        method: HTTP method (POST or GET).
+        body: Parsed JSON body for POST requests.
+        query_params: Query parameters for GET requests.
 
-        response = query_table_with_keys(table, data.s3Key)
-        if 'Items' in response and response['Items']:
-            item = response['Items'][0]
-            if not data.reEval:
-                return process_response(item, data)
+    Returns:
+        dict: Response with statusCode and body.
+    """
+    if method == "POST":
+        if not body:
+            raise ValueError("POST request missing body.")
 
-        # Convert validated input to a dictionary
-        payload = asdict(data)
-        payload['jobId'] = id
-        payload['timeStamp'] = datetime.now().isoformat()
+        data = RequestData(**body)
+        try:
+            # Query the DynamoDB table based on `s3Key`
+            response = query_table_with_keys(table, data.s3Key)
+            if 'Items' in response and response['Items']:
+                item = response['Items'][0]
+                if not data.reEval:
+                    return process_response(item, data)
 
-        # Convert payload to JSON string
-        payload_json = json.dumps(payload)
+            # If no cached results, invoke SageMaker endpoint
+            payload = asdict(data)
+            payload['jobId'] = request_id
+            payload['timeStamp'] = datetime.now().isoformat()
 
-        # Invoke the SageMaker endpoint
-        response = sagemaker_runtime.invoke_endpoint(
-            EndpointName=endpoint_name,
-            ContentType="application/json",
-            Body=payload_json
-        )
-        
-        # Read the response body
-        result = json.loads(response['Body'].read().decode('utf-8'))
-        
+            payload_json = json.dumps(payload)
+            sm_response = sagemaker_runtime.invoke_endpoint(
+                EndpointName=endpoint_name,
+                ContentType="application/json",
+                Body=payload_json
+            )
+            result = json.loads(sm_response['Body'].read().decode('utf-8'))
+            return {
+                "statusCode": 200,
+                "body": result
+            }
+
+        except Exception as e:
+            return {
+                "statusCode": 500,
+                "body": {"message": str(e)}
+            }
+
+    elif method == "GET":
+        if not query_params or "jobId" not in query_params:
+            return {
+                "statusCode": 400,
+                "body": {"message": "Missing required query parameter: jobId"}
+            }
+
+        job_id = query_params["jobId"]
+        try:
+            response = query_table_with_keys(table, None, job_id=job_id)
+            if "Items" in response and response["Items"]:
+                item = response["Items"][0]
+                return process_response(item, data=None)
+
+            return {
+                "statusCode": 404,
+                "body": {"message": f"Job ID {job_id} not found."}
+            }
+
+        except Exception as e:
+            return {
+                "statusCode": 500,
+                "body": {"message": str(e)}
+            }
+
+    else:
         return {
-            "statusCode": 200,
-            "body": json.dumps(result)
-        }
-    except ValueError as e:
-        # Handle validation errors
-        return {
-            "statusCode": 400,
-            "body": json.dumps({"error": str(e)})
-        }
-    except Exception as e:
-        # Handle other exceptions
-        return {
-            "statusCode": 500,
-            "body": json.dumps({"error": str(e)})
+            "statusCode": 405,
+            "body": {"message": "Method Not Allowed"}
         }

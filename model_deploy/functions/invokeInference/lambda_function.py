@@ -21,16 +21,30 @@ def lambda_handler(event, context):
     Returns:
         dict: The response object with statusCode, headers, and body.
     """
-    print("Event:\t" + json.dumps(event))
+    print("Event: ", json.dumps(event))
 
     try:
-        response = get_inference(context.aws_request_id, event)
-        print(f"RequestId: {context.aws_request_id},\t response:{response}")
+        method = event.get("httpMethod")
+        if not method:
+            return {
+                "statusCode": 400,
+                "headers": cors_header,
+                "body": json.dumps({"message": "Invalid request: Missing httpMethod."}),
+            }
+
+        # Delegate method-specific logic to `get_inference`
+        response = get_inference(
+            request_id=context.aws_request_id,
+            method=method,
+            body=json.loads(event["body"]) if "body" in event and event["body"] else None,
+            query_params=event.get("queryStringParameters", {})
+        )
         return {
-            "statusCode": 200,
+            "statusCode": response.get("statusCode", 200),
             "headers": cors_header,
-            "body": json.dumps(response) if response else None,
+            "body": json.dumps(response.get("body", {})),
         }
+
     except Exception as e:
         print("Error: ", e)
         message = str(e)
