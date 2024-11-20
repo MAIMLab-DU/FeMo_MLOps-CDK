@@ -5,11 +5,14 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
 import * as path from 'path';
 
 export interface InferencApiConstructProps {
     readonly ipCIDRBlocks: string[];
+    readonly apiStage: string;
     readonly sageMakeEndpointArn: string;
     readonly sageMakerEndpointName: string;
     readonly inferenceResultTable: dynamodb.Table;
@@ -71,41 +74,13 @@ export class InferenceApiConstruct extends Construct {
                 allowMethods: apigateway.Cors.ALL_METHODS,
             },
             policy: apigatewayPolicy,
+            deploy: false,
         });
 
         const model = this.api.addModel('InferenceRequestModel', {
             modelName: 'InferenceRequestModel',
             schema: validationSchema,
             contentType: 'application/json',
-        });
-
-        // Optional Custom Domain Configuration
-        if (props.customDomainName && props.acmCertificateArn) {
-            const certificate = certificatemanager.Certificate.fromCertificateArn(
-                this,
-                'ACMCertificate',
-                props.acmCertificateArn
-            );
-
-            const customDomain = new apigateway.DomainName(this, 'InferenceApiCustomDomain', {
-                domainName: props.customDomainName,
-                certificate,
-            });
-
-            // Map custom domain to the API Gateway
-            customDomain.addBasePathMapping(this.api, {
-                basePath: '', // Use root as the base path
-                stage: this.api.deploymentStage,
-            });
-        }
-
-        this.api.latestDeployment?.addToLogicalId(Token.asAny(apigatewayPolicy));
-
-        this.api.addUsagePlan('InferenceApiUsagePlan', {
-            name: 'InferenceApiUsagePlan',
-            apiStages: [{ api: this.api, stage: this.api.deploymentStage }],
-            throttle: { burstLimit: 500, rateLimit: 1000 },
-            quota: { limit: 10000000, period: apigateway.Period.MONTH },
         });
 
         const inferenceApiFunctionRole = new iam.Role(this, 'InferenceApiFunctionRole', {
@@ -181,5 +156,51 @@ export class InferenceApiConstruct extends Construct {
                 },
             ],
         });
+
+        const deployment = new apigateway.Deployment(this, 'InferenceApiDeployment', {
+            api: this.api,
+        });
+
+        const stage = new apigateway.Stage(this, `InferenceApiDeploymentStage${props.apiStage}`, {
+            deployment,
+            stageName: props.apiStage,
+        });
+
+        this.api.deploymentStage = stage;
+        this.api.latestDeployment?.addToLogicalId(Token.asAny(apigatewayPolicy));
+
+        this.api.addUsagePlan('InferenceApiUsagePlan', {
+            name: 'InferenceApiUsagePlan',
+            apiStages: [{ api: this.api, stage: this.api.deploymentStage }],
+            throttle: { burstLimit: 500, rateLimit: 1000 },
+            quota: { limit: 10000000, period: apigateway.Period.MONTH },
+        });
+
+        // Optional Custom Domain Configuration
+        if (props.customDomainName && props.acmCertificateArn) {
+            const certificate = certificatemanager.Certificate.fromCertificateArn(
+                this,
+                'ACMCertificate',
+                props.acmCertificateArn
+            );
+
+            this.api.addDomainName('InferenceApiCustomDomain', {
+                domainName: props.customDomainName,
+                certificate: certificate,
+                basePath: props.apiStage === 'dev' ? 'dev' : '',
+            });
+
+            // Lookup an existing Route 53 Hosted Zone for the custom domain
+            const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
+                domainName: props.customDomainName.split('.').slice(1).join('.'), // Extract parent domain (e.g., "example.com")
+            });
+
+            // Create a Route 53 ARecord pointing to the API Gateway domain name
+            new route53.ARecord(this, 'ApiGatewayAliasRecord', {
+                zone: hostedZone,
+                target: route53.RecordTarget.fromAlias(new route53Targets.ApiGateway(this.api)),
+                recordName: props.customDomainName,
+            });
+        }
     }
 }

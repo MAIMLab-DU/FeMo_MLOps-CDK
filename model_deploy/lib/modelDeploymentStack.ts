@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT-0
 import { Construct } from 'constructs';
-import { Stack, StackProps, CfnParameter, CustomResource, Duration } from 'aws-cdk-lib';
+import { Stack, StackProps, CfnParameter, CustomResource, CfnOutput, Duration } from 'aws-cdk-lib';
 import { InferenceApiConstruct } from './inferenceApiConstruct';
 import * as path from 'path';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -18,11 +18,18 @@ export interface ModelDeploymentStackProps extends StackProps {
     projectName: string;
     customDomainName?: string;
     acmCertificateArn?: string;
+    apiStage?: 'dev' | 'prod';
 }
 
 export class ModelDeploymentStack extends Stack {
     constructor(scope: Construct, id: string, props: ModelDeploymentStackProps) {
-        super(scope, id, props);
+        super(scope, id, {
+            ...props,
+            env: {
+                account: process.env.CDK_DEFAULT_ACCOUNT, // Use the default AWS account
+                region: process.env.CDK_DEFAULT_REGION, // Use the default AWS region
+            },
+        });
 
         const inferenceResultTable = new dynamodb.Table(this, 'InferenceResultTable', {
             partitionKey: { name: 's3Key', type: dynamodb.AttributeType.STRING },
@@ -146,8 +153,14 @@ export class ModelDeploymentStack extends Stack {
             inferenceResultTable: inferenceResultTable,
             customDomainName: props.customDomainName,
             acmCertificateArn: props.acmCertificateArn,
+            apiStage: props.apiStage ?? 'dev',
         });
 
         apiConstruct.node.addDependency(endpoint);
+
+        new CfnOutput(this, 'InferenceApiUrlOutput', {
+            value: apiConstruct.api.url,
+            exportName: `${props.projectName}-InferenceApiUrl`,
+        });
     }
 }
