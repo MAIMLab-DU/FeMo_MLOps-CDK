@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT-0
 import { Construct } from 'constructs';
-import {Stack, StackProps, CfnParameter, CustomResource, Duration } from 'aws-cdk-lib';
+import { Stack, StackProps, CfnParameter, CustomResource, Duration } from 'aws-cdk-lib';
 import { InferenceApiConstruct } from './inferenceApiConstruct';
 import * as path from 'path';
 import * as iam from 'aws-cdk-lib/aws-iam';

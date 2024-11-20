@@ -124,6 +124,8 @@ export class InferenceApiConstruct extends Construct {
         const inferenceIntegration = new apigateway.LambdaIntegration(inferenceApiFunction);
 
         const inferenceEndpoint = this.api.root.addResource('inference');
+
+        // POST Method with Request Body Validation
         inferenceEndpoint.addMethod('POST', inferenceIntegration, {
             requestModels: {
                 'application/json': model,
@@ -131,6 +133,31 @@ export class InferenceApiConstruct extends Construct {
             requestValidatorOptions: {
                 validateRequestBody: true,
             },
+        });
+
+        // GET Method with Query Parameter Validation
+        inferenceEndpoint.addMethod('GET', inferenceIntegration, {
+            requestParameters: {
+                'method.request.querystring.jobId': true, // Require 'jobId' query parameter
+            },
+            requestValidator: new apigateway.RequestValidator(this, 'QueryValidator', {
+                restApi: this.api,
+                validateRequestParameters: true, // Enable request parameter validation
+            }),
+            methodResponses: [
+                {
+                    statusCode: '200',
+                    responseModels: {
+                        'application/json': apigateway.Model.EMPTY_MODEL,
+                    },
+                },
+                {
+                    statusCode: '400',
+                    responseModels: {
+                        'application/json': apigateway.Model.EMPTY_MODEL,
+                    },
+                },
+            ],
         });
     }
 }
