@@ -72,7 +72,6 @@ def query_table_with_keys(table, s3_key=None, job_id=None, limit=1):
         return table.query(
             IndexName='JobIdIndex',  # Name of the GSI
             KeyConditionExpression=Key('jobId').eq(job_id),
-            ConsistentRead=True,
             Limit=limit
         )
     else:
