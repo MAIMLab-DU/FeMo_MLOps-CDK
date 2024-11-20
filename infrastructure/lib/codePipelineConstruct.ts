@@ -167,7 +167,7 @@ export class CodePipelineConstruct extends Construct {
                 },
                 ML_REPO_CONNECTION: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: props.gitML.githubConnectionArn,
+                    value: `${props.gitML.githubRepoOwner}/${props.gitML.githubRepoName}`,
                 },
                 ECR_REPOSITORY_NAME: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
