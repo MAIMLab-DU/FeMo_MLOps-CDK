@@ -30,6 +30,13 @@ export class ModelDeploymentStack extends Stack {
             pointInTimeRecovery: true,
         });
 
+        // Add a Global Secondary Index for jobId
+        inferenceResultTable.addGlobalSecondaryIndex({
+            indexName: 'JobIdIndex', // Name of the GSI
+            partitionKey: { name: 'jobId', type: dynamodb.AttributeType.STRING }, // GSI partition key
+            projectionType: dynamodb.ProjectionType.ALL, // Include all attributes in the index
+        });
+
         const modelPackageName = new CfnParameter(this, 'modelPackageName', {
             type: 'String',
         });
