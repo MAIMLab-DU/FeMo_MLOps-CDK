@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT-0
 import { Stack } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -17,7 +16,6 @@ export type CodePipelineConstructPropsBase = {
 
 export type CodePipelineConstructProps = {
     readonly dataManifestBucket: s3.Bucket;
-    readonly dynamoDbTable: dynamodb.Table;
     readonly ecrRepo: ecr.Repository;
     readonly sageMakerArtifactBucket: s3.Bucket;
     readonly sageMakerExecutionRole: iam.Role;
@@ -31,12 +29,14 @@ export interface CodePipelineConstructPropsGithubSource {
         readonly githubRepoOwner: string;
         readonly githubRepoName: string;
         readonly githubRepoBranch?: string;
+        readonly triggerOnPush?: boolean;
     };
     readonly gitCDK: {
         readonly githubConnectionArn: string;
         readonly githubRepoOwner: string;
         readonly githubRepoName: string;
         readonly githubRepoBranch?: string;
+        readonly triggerOnPush?: boolean;
     };
 }
 
@@ -67,7 +67,7 @@ export class CodePipelineConstruct extends Construct {
             repo: props.gitML.githubRepoName,
             branch: props.gitML.githubRepoBranch || 'main',
             connectionArn: props.gitML.githubConnectionArn,
-            triggerOnPush: false,
+            triggerOnPush: props.gitML.triggerOnPush || false,
         });
         const sourceCDKCode = new codepipeline_actions.CodeStarConnectionsSourceAction({
             actionName: 'SourceCDKCode',
@@ -76,7 +76,7 @@ export class CodePipelineConstruct extends Construct {
             repo: props.gitCDK.githubRepoName,
             branch: props.gitCDK.githubRepoBranch || 'main',
             connectionArn: props.gitCDK.githubConnectionArn,
-            triggerOnPush: false,
+            triggerOnPush: props.gitCDK.triggerOnPush || false,
         });
 
         //Source Data
@@ -167,7 +167,7 @@ export class CodePipelineConstruct extends Construct {
                 },
                 ML_REPO_CONNECTION: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: props.gitML.githubConnectionArn,
+                    value: `${props.gitML.githubRepoOwner}/${props.gitML.githubRepoName}`,
                 },
                 ECR_REPOSITORY_NAME: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
@@ -257,10 +257,6 @@ export class CodePipelineConstruct extends Construct {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: props.ecrRepo.repositoryUri,
                 },
-                DYNAMODB_TABLE: {
-                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: props.dynamoDbTable.tableName,
-                },
                 FORCE_EXTRACT_FEATURES: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: props.sageMakerForceExtractFeatures,
@@ -291,7 +287,7 @@ export class CodePipelineConstruct extends Construct {
 
         //Deploy
         const deploymentApprovalTopic = new sns.Topic(this, 'ModelDeploymentApprovalTopic', {
-            topicName: 'ModelDeploymentApprovalTopic',
+            topicName: `${props.projectName}-ModelDeploymentApprovalTopic`,
         });
 
         const manualApprovalAction = new codepipeline_actions.ManualApprovalAction({
@@ -377,6 +373,13 @@ export class CodePipelineConstruct extends Construct {
 
         deployRole.addToPolicy(
             new iam.PolicyStatement({
+                actions: ['route53:ListHostedZonesByName'],
+                resources: ['*'],
+            })
+        );
+
+        deployRole.addToPolicy(
+            new iam.PolicyStatement({
                 actions: ['ssm:GetParameter'],
                 resources: [`arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/cdk-bootstrap/*`],
             })
@@ -386,14 +389,6 @@ export class CodePipelineConstruct extends Construct {
             new iam.PolicyStatement({
                 actions: ['sts:AssumeRole', 'iam:PassRole'],
                 resources: [`arn:aws:iam::${Stack.of(this).account}:role/cdk*`],
-            })
-        );
-
-        deployRole.addToPolicy(
-            iam.PolicyStatement.fromJson({
-                Effect: 'Allow',
-                Action: ['dynamodb:*'],
-                Resource: [props.dynamoDbTable.tableArn, `${props.dynamoDbTable.tableArn}/*`],
             })
         );
 
@@ -412,6 +407,16 @@ export class CodePipelineConstruct extends Construct {
             project: deployProject,
             input: buildOutputCDK,
             extraInputs: [pipelineOutput],
+            environmentVariables: {
+                CDK_DEFAULT_ACCOUNT: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: Stack.of(this).account,
+                },
+                CDK_DEFAULT_REGION: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: Stack.of(this).region,
+                },
+            },
         });
 
         this.pipeline.addStage({

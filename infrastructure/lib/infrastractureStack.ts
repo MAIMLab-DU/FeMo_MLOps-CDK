@@ -3,7 +3,6 @@ import { Stack, StackProps, CfnOutput } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { CodePipelineConstruct, CodePipelineConstructPropsBase } from './codePipelineConstruct';
 import { DataSourceConstruct, DataSourceConstructProps } from './dataSourceConstruct';
-import { DynamoDBConstruct } from './dynamoDbConstruct';
 import { EcrConstruct } from './ecrRepositoryConstruct';
 import { SageMakerConstruct } from './sageMakerConstruct';
 
@@ -17,18 +16,15 @@ export class InfrastractureStack extends Stack {
             ...props,
         });
 
-        const dynamodb = new DynamoDBConstruct(this, 'DynamoDbConstruct');
         const ecrRepos = new EcrConstruct(this, 'EcrRepositoryConstruct');
 
         const sageMaker = new SageMakerConstruct(this, 'SageMakerConstruct', {
             dataBucket: dataSource.dataBucket,
-            dynamoDbTable: dynamodb.dynamoDBTable,
         });
 
         const codePipeline = new CodePipelineConstruct(this, 'CodePipeline', {
             ...props,
             dataManifestBucket: dataSource.dataManifestBucket,
-            dynamoDbTable: dynamodb.dynamoDBTable,
             ecrRepo: ecrRepos.ecrRepository,
             sageMakerArtifactBucket: sageMaker.sagemakerArtifactBucket,
             sageMakerExecutionRole: sageMaker.sagemakerExecutionRole,
@@ -37,37 +33,32 @@ export class InfrastractureStack extends Stack {
 
         new CfnOutput(this, 'CodePipelineOutput', {
             value: codePipeline.pipeline.pipelineName,
-            exportName: 'FeMo-CodePipeline',
+            exportName: `${props.projectName}-CodePipeline`,
         });
 
         new CfnOutput(this, 'DataBucketOutput', {
             value: dataSource.dataBucket.bucketName,
-            exportName: 'FeMo-DataBucket',
-        });
-
-        new CfnOutput(this, 'DynamoDbOutput', {
-            value: dynamodb.dynamoDBTable.tableArn,
-            exportName: 'FeMo-DynamoDbInferenceResults',
+            exportName: `${props.projectName}-DataBucket`,
         });
 
         new CfnOutput(this, 'EcrRepositoryOutput', {
             value: ecrRepos.ecrRepository.repositoryArn,
-            exportName: 'FeMo-EcrRepository',
+            exportName: `${props.projectName}-EcrRepository`,
         });
 
         new CfnOutput(this, 'DataManifestBucketOutput', {
-            value: dataSource.dataManifestBucket.bucketName,
-            exportName: 'FeMo-DataManifestBucket',
+            value: dataSource.dataManifestBucket.bucketArn,
+            exportName: `${props.projectName}-DataManifestBucket`,
         });
 
         new CfnOutput(this, 'SageMakerArtifactBucketOutput', {
-            value: sageMaker.sagemakerArtifactBucket.bucketName,
-            exportName: 'FeMo-SageMakerArtifactBucket',
+            value: sageMaker.sagemakerArtifactBucket.bucketArn,
+            exportName: `${props.projectName}-SageMakerArtifactBucket`,
         });
 
         new CfnOutput(this, 'SageMakerExecutionRoleOutput', {
             value: sageMaker.sagemakerExecutionRole.roleArn,
-            exportName: 'FeMo-SageMakerExecutionRole',
+            exportName: `${props.projectName}-SageMakerExecutionRole`,
         });
     }
 }

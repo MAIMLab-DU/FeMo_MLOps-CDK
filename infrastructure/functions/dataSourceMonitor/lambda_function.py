@@ -118,7 +118,7 @@ def check_and_read_manifest():
             print(f"Error checking or downloading manifest.json: {e}")
         return None
 
-def handler(event, context):
+def lambda_handler(event, context):
     """Lambda function handler for periodic execution."""
     print("Lambda triggered by periodic event")
 

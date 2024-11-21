@@ -62,7 +62,7 @@ export class DataSourceConstruct extends Construct {
         // Lambda function to monitor the bucket
         const dataMonitorFunction = new lambda.Function(this, 'DataSourceMonitorFunction', {
             runtime: lambda.Runtime.PYTHON_3_10, // Use Python 3.10 runtime
-            handler: 'index.handler', // Python handler defined as 'filename.function_name'
+            handler: 'lambda_function.lambda_handler', // Python handler defined as 'filename.function_name'
             code: lambda.Code.fromAsset(path.join(__dirname, '../functions/dataSourceMonitor'), {
                 exclude: ['.venv', '.ruff_cache', '.pytest_cache', '*.pyc', '__pycache__'],
             }),
