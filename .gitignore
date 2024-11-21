@@ -136,5 +136,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-configuration/projectConfig.json
+configuration/*.json
 .ruff_cache/
