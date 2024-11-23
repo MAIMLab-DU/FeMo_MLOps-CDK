@@ -162,7 +162,7 @@ export class CodePipelineConstruct extends Construct {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: Stack.of(this).account,
                 },
-                ML_REPO_CONNECTION: {
+                ML_REPOSITORY_ID: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: `${props.gitML.githubRepoOwner}/${props.gitML.githubRepoName}`,
                 },
