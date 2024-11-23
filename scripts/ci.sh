@@ -2,7 +2,7 @@
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILENAME="configuration/projectConfig.json"
+CONFIG_LOCAL_PATH="configuration/projectConfig.json"
 
 UPLOAD_FLAG=false
 CONFIG_S3_PATH=""
@@ -21,6 +21,32 @@ function show_help {
   echo "  -h, --help             Show this help message and exit."
   echo
   exit 0
+}
+
+function upload_to_s3 {
+  # Extract bucket name and object key from CONFIG_S3_PATH
+  bucket_name=$(echo "$CONFIG_S3_PATH" | cut -d'/' -f3)
+  object_key=$(echo "$CONFIG_S3_PATH" | cut -d'/' -f4-)
+  # Get current ETag from S3
+  REMOTE_ETAG=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" --query "ETag" --profile "$PROFILE" --output text 2>/dev/null | tr -d '"')
+
+  # Check if the file exists in S3
+  if [[ -z "$REMOTE_ETAG" ]]; then
+    echo "No existing object found in S3. Uploading..."
+    aws s3 cp "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
+    return
+  fi
+
+  # Calculate MD5 checksum of the local file
+  LOCAL_MD5=$(md5sum "$CONFIG_LOCAL_PATH" | awk '{print $1}')
+
+  # Compare and upload only if different
+  if [[ "$REMOTE_ETAG" != "$LOCAL_MD5" ]]; then
+    echo "Uploading modified object to S3..."
+    aws s3 cp "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
+  else
+    echo "No changes detected. Skipping upload."
+  fi
 }
 
 # Parse command-line arguments
@@ -58,15 +84,21 @@ if [[ -z "$CONFIG_S3_PATH" ]]; then
   exit 1
 fi
 
+# Validate CONFIG_S3_PATH format
+if [[ ! "$CONFIG_S3_PATH" =~ ^s3://[^/]+/.+\.json$ ]]; then
+  echo "Error: CONFIG_S3_PATH must be in the format 's3://bucket/key.json'"
+  exit 1
+fi
+
+
 # If upload flag is set, upload the $S3_KEY file to S3
 if [[ "$UPLOAD_FLAG" == true ]]; then
-    echo "Uploading '$CONFIG_FILENAME' to S3 path '$CONFIG_S3_PATH'..."
-    aws s3 cp "$CONFIG_FILENAME" "$CONFIG_S3_PATH" --profile "$PROFILE"
+  upload_to_s3
 fi
 
 # Download the configuration file from S3
-echo "Downloading '$CONFIG_FILENAME' from S3 path '$CONFIG_S3_PATH'..."
-aws s3 cp "$CONFIG_S3_PATH" "$CONFIG_FILENAME" --profile "$PROFILE"
+echo "Downloading '$CONFIG_LOCAL_PATH' from S3 path '$CONFIG_S3_PATH'..."
+aws s3 cp "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH" --profile "$PROFILE"
 
 # Navigate to the infrastructure directory
 pushd $SCRIPT_DIR/../infrastructure
