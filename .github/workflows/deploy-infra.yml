@@ -1,6 +1,7 @@
 name: Build and Deploy Infrastructure
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -48,12 +49,14 @@ jobs:
         run: |
           if [[ "${{ github.ref_name }}" == "dev" ]]; then
             bash scripts/create_aws_profile.sh -p "${{ secrets.DEV_AWS_PROFILE }}" -i "${{ secrets.DEV_ACCESS_KEY_ID }}" -k "${{ secrets.DEV_SECRET_ACCESS_KEY }}" -r "${{ secrets.DEV_REGION }}"
-            bash scripts/ci.sh -c "${{ secrets.DEV_CONFIG_PATH }}" -p "${{ secrets.DEV_AWS_PROFILE }}"
+            echo "${{ secrets.DEV_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
+            bash scripts/ci.sh -c "${{ secrets.DEV_CONFIG_PATH }}" -p "${{ secrets.DEV_AWS_PROFILE }}" --upload
             cd infrastructure/
             yarn cdk deploy --require-approval never --parameters projectConfigPath="${{ secrets.DEV_CONFIG_PATH }}" --profile "${{ secrets.DEV_AWS_PROFILE }}" --app cdk.out/
           elif [[ "${{ github.ref_name }}" == "main" ]]; then
             bash scripts/create_aws_profile.sh -p "${{ secrets.PROD_AWS_PROFILE }}" -i "${{ secrets.PROD_ACCESS_KEY_ID }}" -k "${{ secrets.PROD_SECRET_ACCESS_KEY }}" -r "${{ secrets.PROD_REGION }}"
-            bash scripts/ci.sh -c "${{ secrets.PROD_CONFIG_PATH }}" -p "${{ secrets.PROD_AWS_PROFILE }}"
+            echo "${{ secrets.PROD_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
+            bash scripts/ci.sh -c "${{ secrets.PROD_CONFIG_PATH }}" -p "${{ secrets.PROD_AWS_PROFILE }}" --upload
             yarn cdk deploy --parameters projectConfigPath="${{ secrets.PROD_CONFIG_PATH }}" --profile "${{ secrets.PROD_AWS_PROFILE }}"
           else
             echo "Unsupported branch: ${{ github.ref_name }}"
