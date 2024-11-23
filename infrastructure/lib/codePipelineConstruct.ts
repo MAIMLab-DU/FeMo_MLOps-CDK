@@ -15,6 +15,7 @@ export type CodePipelineConstructPropsBase = {
 } & CodePipelineConstructPropsGithubSource;
 
 export type CodePipelineConstructProps = {
+    readonly ciBucketName: string;
     readonly dataManifestBucket: s3.Bucket;
     readonly ecrRepo: ecr.Repository;
     readonly sageMakerArtifactBucket: s3.Bucket;
@@ -23,7 +24,6 @@ export type CodePipelineConstructProps = {
 
 export interface CodePipelineConstructPropsGithubSource {
     readonly repoType: 'git';
-    readonly ciBucketName: string;
     readonly gitML: {
         readonly githubConnectionArn: string;
         readonly githubRepoOwner: string;
