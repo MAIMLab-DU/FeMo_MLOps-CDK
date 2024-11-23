@@ -40,32 +40,32 @@ export class InfrastractureStack extends Stack {
 
         new CfnOutput(this, 'CodePipelineOutput', {
             value: codePipeline.pipeline.pipelineName,
-            exportName: `${props.projectName}-CodePipeline`,
+            exportName: `${Stack.of(this).stackName}-CodePipeline`,
         });
 
         new CfnOutput(this, 'DataBucketOutput', {
             value: dataSource.dataBucket.bucketName,
-            exportName: `${props.projectName}-DataBucket`,
+            exportName: `${Stack.of(this).stackName}-DataBucket`,
         });
 
         new CfnOutput(this, 'EcrRepositoryOutput', {
             value: ecrRepos.ecrRepository.repositoryArn,
-            exportName: `${props.projectName}-EcrRepository`,
+            exportName: `${Stack.of(this).stackName}-EcrRepository`,
         });
 
         new CfnOutput(this, 'DataManifestBucketOutput', {
-            value: dataSource.dataManifestBucket.bucketArn,
-            exportName: `${props.projectName}-DataManifestBucket`,
+            value: dataSource.dataManifestBucket.bucketName,
+            exportName: `${Stack.of(this).stackName}-DataManifestBucket`,
         });
 
         new CfnOutput(this, 'SageMakerArtifactBucketOutput', {
-            value: sageMaker.sagemakerArtifactBucket.bucketArn,
-            exportName: `${props.projectName}-SageMakerArtifactBucket`,
+            value: sageMaker.sagemakerArtifactBucket.bucketName,
+            exportName: `${Stack.of(this).stackName}-SageMakerArtifactBucket`,
         });
 
         new CfnOutput(this, 'SageMakerExecutionRoleOutput', {
             value: sageMaker.sagemakerExecutionRole.roleArn,
-            exportName: `${props.projectName}-SageMakerExecutionRole`,
+            exportName: `${Stack.of(this).stackName}-SageMakerExecutionRole`,
         });
     }
 }
