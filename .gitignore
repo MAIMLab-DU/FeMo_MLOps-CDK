@@ -138,3 +138,4 @@ dmypy.json
 .pyre/
 configuration/*.json
 .ruff_cache/
+*.secrets
