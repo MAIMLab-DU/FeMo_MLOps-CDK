@@ -16,7 +16,7 @@ export type CodePipelineConstructPropsBase = {
 } & CodePipelineConstructPropsGithubSource;
 
 export type CodePipelineConstructProps = {
-    readonly ciBucketName: string;
+    readonly projectConfigPath: string;
     readonly dataManifestBucket: s3.Bucket;
     readonly ecrRepo: ecr.Repository;
     readonly sageMakerArtifactBucket: s3.Bucket;
@@ -143,9 +143,9 @@ export class CodePipelineConstruct extends Construct {
             extraInputs: [sourceMLCodeOutput, sourceDataOutput],
             outputs: [buildOutputCDK, buildOutputML],
             environmentVariables: {
-                S3_CIBUCKET: {
+                CONFIG_S3_PATH: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: props.ciBucketName,
+                    value: props.projectConfigPath,
                 },
                 AWS_DEFAULT_REGION: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,

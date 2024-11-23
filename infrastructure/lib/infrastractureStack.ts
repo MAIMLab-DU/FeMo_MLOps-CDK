@@ -30,7 +30,7 @@ export class InfrastractureStack extends Stack {
 
         const codePipeline = new CodePipelineConstruct(this, 'CodePipeline', {
             ...props,
-            ciBucketName: projectConfigPath.valueAsString,
+            projectConfigPath: projectConfigPath.valueAsString,
             dataManifestBucket: dataSource.dataManifestBucket,
             ecrRepo: ecrRepos.ecrRepository,
             sageMakerArtifactBucket: sageMaker.sagemakerArtifactBucket,
