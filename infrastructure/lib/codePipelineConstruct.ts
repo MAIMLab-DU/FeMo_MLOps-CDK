@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT-0
 import { Stack } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
+// import { GitConfiguration } from 'aws-cdk-lib/aws-codepipeline';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -29,14 +30,14 @@ export interface CodePipelineConstructPropsGithubSource {
         readonly githubRepoOwner: string;
         readonly githubRepoName: string;
         readonly githubRepoBranch?: string;
-        readonly pushFilter?: Array<{ tagsExcludes?: string[]; tagsIncludes: string[] }>;
+        readonly pushFilter: Array<{ tagsExcludes?: string[]; tagsIncludes: string[] }>;
     };
     readonly gitCDK: {
         readonly githubConnectionArn: string;
         readonly githubRepoOwner: string;
         readonly githubRepoName: string;
         readonly githubRepoBranch?: string;
-        readonly pushFilter?: Array<{ tagsExcludes?: string[]; tagsIncludes: string[] }>;
+        readonly pushFilter: Array<{ tagsExcludes?: string[]; tagsIncludes: string[] }>;
     };
 }
 
@@ -90,6 +91,7 @@ export class CodePipelineConstruct extends Construct {
             stageName: 'Source',
             actions: [sourceCDKCode, sourceMLCode, sourceData],
         });
+        console.log(`props.gitML.pushFilter: ${props.gitML.pushFilter}`);
         this.pipeline.addTrigger({
             providerType: codepipeline.ProviderType.CODE_STAR_SOURCE_CONNECTION,
             gitConfiguration: {
