@@ -71,7 +71,6 @@ export class DataSourceConstruct extends Construct {
             environment: {
                 DATA_BUCKET_NAME: this.dataBucket.bucketName,
                 DATA_MANIFEST_BUCKET_NAME: this.dataManifestBucket.bucketName,
-                MIN_DIFF: props.minNumberOfFiles.toString(),
             },
         });
 

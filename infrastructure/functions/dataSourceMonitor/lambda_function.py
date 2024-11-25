@@ -1,8 +1,9 @@
 import json
+import time
 import os
 import boto3
-import zipfile
 import tempfile
+import zipfile
 from datetime import datetime
 from botocore.exceptions import ClientError
 
@@ -10,23 +11,37 @@ from botocore.exceptions import ClientError
 s3_client = boto3.client('s3')
 DATA_BUCKET_NAME = os.environ.get('DATA_BUCKET_NAME', '')
 MANIFEST_BUCKET_NAME = os.environ.get('DATA_MANIFEST_BUCKET_NAME', '')
-MIN_DIFF = int(os.environ.get('MIN_DIFF', 1))
 
-def list_all_objects(bucket_name):
-    """List all objects in the specified S3 bucket, handle pagination."""
-    all_objects = []
+def list_objects_by_belt_type(bucket_name):
+    """Group objects by belt type from folder structure `<beltType>/<deviceId>/<logfile.dat>`."""
+    grouped_objects = {}
     continuation_token = None
-
+    
     try:
         while True:
-            if continuation_token:
+            if continuation_token:                
                 response = s3_client.list_objects_v2(Bucket=bucket_name, ContinuationToken=continuation_token)
             else:
                 response = s3_client.list_objects_v2(Bucket=bucket_name)
 
-            objects = response.get('Contents', [])
-            all_objects.extend([{'bucketName': bucket_name, 'datFileKey': obj['Key'], 'csvFileKey': obj['Key'].replace('.dat', '.csv')}
-                                for obj in objects if obj['Key'].endswith('.dat')])
+            for obj in response.get('Contents', []):
+                key = obj['Key']
+                if not key.endswith('.dat'):
+                    continue
+                parts = key.split('/')
+                if len(parts) < 3:
+                    print(f"Skipping invalid file path: {key}")
+                    continue
+                
+                belt_type, device_id, file_name = parts[0], parts[1], parts[2]
+                if belt_type not in grouped_objects:
+                    grouped_objects[belt_type] = []
+                grouped_objects[belt_type].append({
+                    "deviceId": device_id,
+                    "fileName": file_name,
+                    "datFileKey": key,
+                    "csvFileKey": key.replace('.dat', '.csv')
+                })
 
             if response.get('IsTruncated'):
                 continuation_token = response['NextContinuationToken']
@@ -37,73 +52,83 @@ def list_all_objects(bucket_name):
         print(f"Error listing objects in bucket {bucket_name}: {e}")
         raise e
 
-    return all_objects
+    return grouped_objects
 
-def build_manifest_file_content(previous_manifest=None):
-    """Create a manifest content from the current state of the S3 bucket."""
-    all_objects = list_all_objects(DATA_BUCKET_NAME)
+def build_manifest(previous_manifest=None, all_objects=None, belt_type=None):
+    """
+    Build a manifest for a specific belt type, incorporating the provided logic
+    for checking differences in object count.
+    """
     version = datetime.now().strftime("%Y-%m-%d_%H:%M")
-    print(f"Current manifest item count: {len(all_objects)}")
 
+    # Handle the case where there are no previous manifests
     if previous_manifest is None:
-        if len(all_objects) == 0:
+        if not all_objects or len(all_objects) == 0:
             return None
         else:
             current_manifest = {
                 "version": version,
+                "beltType": belt_type,
                 "lastNumObjects": len(all_objects),
                 "items": all_objects
             }
     else:
+        # Compare the difference in object count
         difference = len(all_objects) - previous_manifest['lastNumObjects']
-        if difference >= MIN_DIFF:
+        if difference != 0:
             current_manifest = {
                 "version": version,
+                "beltType": belt_type,
                 "lastNumObjects": len(all_objects),
                 "items": all_objects
             }
         else:
-            print("No significant change in the number of objects. Skipping manifest update.")
+            print(f"No change in the number of objects for {belt_type}. Skipping manifest update.")
             return None
 
-    return json.dumps(current_manifest, indent=4)
+    return current_manifest
 
-def upload_manifest_to_s3(file_content):
-    """Upload the manifest.json file directly to the specified S3 bucket."""
+
+def upload_manifest_to_s3(manifest, belt_type):
+    """Upload the manifest file for a specific belt type to the manifest bucket."""
+    manifest_file_name = f"manifest-{belt_type}.json"
+    manifest_file_content = json.dumps(manifest, indent=4)
     temp_dir = tempfile.gettempdir()
-    zip_file_path = os.path.join(temp_dir, "manifest.json.zip")
+    zip_file_path = os.path.join(temp_dir, f"{manifest_file_name}.zip")
     with zipfile.ZipFile(zip_file_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        zipf.writestr("manifest.json", file_content)
+        zipf.writestr(manifest_file_name, manifest_file_content)
 
     try:
+        # Upload the manifest JSON file
         s3_client.put_object(
             Bucket=MANIFEST_BUCKET_NAME,
-            Key="manifest.json",
-            Body=file_content,
+            Key=manifest_file_name,
+            Body=manifest_file_content,
             ContentType='application/json'
         )
         with open(zip_file_path, 'rb') as file_data:
             s3_client.put_object(
                 Bucket=MANIFEST_BUCKET_NAME,
-                Key="manifest.json.zip",
+                Key=f"{manifest_file_name}.zip",
                 Body=file_data
             )
-
-        print(f"Uploaded manifest.json to {MANIFEST_BUCKET_NAME}")
+        print(f"Uploaded {manifest_file_name} to {MANIFEST_BUCKET_NAME}")
     except ClientError as e:
-        print(f"Error uploading to S3: {e}")
+        print(f"Error uploading manifest for {belt_type}: {e}")
         raise e
 
-def check_and_read_manifest():
+
+def check_and_read_manifest(belt_type):
     """Check if manifest.json exists in the bucket and read the manifest.json if it does."""
     try:
-        s3_client.head_object(Bucket=MANIFEST_BUCKET_NAME, Key='manifest.json')
-        print("manifest.json exists, downloading...")
+        manifest_file_name = f"manifest-{belt_type}.json"
+        s3_client.head_object(Bucket=MANIFEST_BUCKET_NAME, Key=manifest_file_name)
+        print(f"{manifest_file_name} exists, downloading...")
 
         temp_dir = tempfile.gettempdir()
-        manifest_file_path = os.path.join(temp_dir, 'manifest.json')
+        manifest_file_path = os.path.join(temp_dir, manifest_file_name)
         
-        s3_client.download_file(MANIFEST_BUCKET_NAME, 'manifest.json', manifest_file_path)
+        s3_client.download_file(MANIFEST_BUCKET_NAME, manifest_file_name, manifest_file_path)
         
         with open(manifest_file_path, 'r') as manifest_file:
             manifest_content = json.load(manifest_file)
@@ -113,26 +138,39 @@ def check_and_read_manifest():
 
     except ClientError as e:
         if e.response['Error']['Code'] == '404':
-            print("manifest.json does not exist.")
+            print(f"{manifest_file_name} does not exist.")
         else:
             print(f"Error checking or downloading manifest.json: {e}")
         return None
 
+
 def lambda_handler(event, context):
-    """Lambda function handler for periodic execution."""
-    print("Lambda triggered by periodic event")
+    """Lambda function handler to generate and upload manifests for each belt type."""
+    print("Lambda triggered to process S3 log files and generate manifests.")
 
     try:
-        # Check existing manifest
-        previous_manifest = check_and_read_manifest()
-        
-        # Build the new manifest
-        file_content = build_manifest_file_content(previous_manifest)
+        # Group objects by belt type
+        grouped_objects = list_objects_by_belt_type(DATA_BUCKET_NAME)
 
-        # If there are significant changes, upload the new manifest
-        if file_content is not None:
-            upload_manifest_to_s3(file_content)
+        # Process each belt type
+        for belt_type, items in grouped_objects.items():
+            print(f"Processing belt type: {belt_type} with {len(items)} items.")
+
+            # Check for previous manifest
+            previous_manifest = check_and_read_manifest(belt_type)  # Modify to fetch based on belt type if needed
+            
+            # Build the manifest for this belt type
+            manifest = build_manifest(previous_manifest=previous_manifest, all_objects=items, belt_type=belt_type)
+
+            # Upload the manifest if it was generated
+            if manifest is not None:
+                upload_manifest_to_s3(manifest, belt_type)
+            
+            # Sleep added to ensure queueing of Codepipeline execution
+            if len(grouped_objects) > 1:          
+                time.sleep(10)
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error in Lambda execution: {e}")
         raise e
+
