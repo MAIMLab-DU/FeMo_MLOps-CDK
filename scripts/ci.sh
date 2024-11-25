@@ -6,7 +6,7 @@ CONFIG_LOCAL_PATH="configuration/projectConfig.json"
 
 UPLOAD_FLAG=false
 CONFIG_S3_PATH=""
-PROFILE="default"
+PROFILE=""
 
 # Function to display help
 function show_help {
@@ -28,12 +28,20 @@ function upload_to_s3 {
   bucket_name=$(echo "$CONFIG_S3_PATH" | cut -d'/' -f3)
   object_key=$(echo "$CONFIG_S3_PATH" | cut -d'/' -f4-)
   # Get current ETag from S3
-  REMOTE_ETAG=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" --query "ETag" --profile "$PROFILE" --output text 2>/dev/null | tr -d '"')
+  if [[ -n "$PROFILE" ]]; then
+    REMOTE_ETAG=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" --query "ETag" --profile "$PROFILE" --output text 2>/dev/null | tr -d '"')
+  else
+    REMOTE_ETAG=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" --query "ETag" --output text 2>/dev/null | tr -d '*')
+  fi
 
   # Check if the file exists in S3
   if [[ -z "$REMOTE_ETAG" ]]; then
     echo "No existing object found in S3. Uploading..."
-    aws s3 cp "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
+    if [[ -n "$PROFILE" ]]; then
+      aws s3 cp "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
+    else
+      aws s3 cp "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH"
+    fi
     return
   fi
 
@@ -90,7 +98,6 @@ if [[ ! "$CONFIG_S3_PATH" =~ ^s3://[^/]+/.+\.json$ ]]; then
   exit 1
 fi
 
-
 # If upload flag is set, upload the $S3_KEY file to S3
 if [[ "$UPLOAD_FLAG" == true ]]; then
   upload_to_s3
@@ -98,7 +105,11 @@ fi
 
 # Download the configuration file from S3
 echo "Downloading '$CONFIG_LOCAL_PATH' from S3 path '$CONFIG_S3_PATH'..."
-aws s3 cp "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH" --profile "$PROFILE"
+if [[ -n "$PROFILE" ]]; then
+  aws s3 cp "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH" --profile "$PROFILE"
+else
+  aws s3 cp "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH"
+fi
 
 # Navigate to the infrastructure directory
 pushd $SCRIPT_DIR/../infrastructure
@@ -116,5 +127,9 @@ popd
 yarn install --frozen-lockfile
 yarn lint
 yarn build
-yarn cdk synth --parameter projectConfigPath="$CONFIG_S3_PATH" --profile "$PROFILE" --verbose > template.yml
+if [[ -n "$PROFILE" ]]; then 
+  yarn cdk synth --parameter projectConfigPath="$CONFIG_S3_PATH" --profile "$PROFILE" --verbose > template.yml
+else
+  yarn cdk synth --parameter projectConfigPath="$CONFIG_S3_PATH" --verbose > template.yml
+fi
 popd
