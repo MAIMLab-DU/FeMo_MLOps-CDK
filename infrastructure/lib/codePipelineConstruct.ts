@@ -125,7 +125,7 @@ export class CodePipelineConstruct extends Construct {
         buildProject.addToRolePolicy(
             new iam.PolicyStatement({
                 actions: ['ecr:*'],
-                resources: [props.ecrRepo.repositoryArn, `${props.ecrRepo.repositoryArn}/*`],
+                resources: ['*'],
             })
         );
 
