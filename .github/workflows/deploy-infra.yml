@@ -34,16 +34,6 @@ jobs:
         with:
           python-version: '3.10'
 
-      # Install AWS CLI
-      - name: Install AWS CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip -q awscliv2.zip
-          sudo ./aws/install
-          aws --version
-
       # Create AWS Profile
       - name: Deploy CDK Stack to AWS
         run: |
