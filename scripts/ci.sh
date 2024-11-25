@@ -5,12 +5,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_LOCAL_PATH="configuration/projectConfig.json"
 
 UPLOAD_FLAG=false
+CODEBUILD_FLAG=false
 CONFIG_S3_PATH=""
 PROFILE="default"
 
 # Function to display help
 function show_help {
-  echo "Usage: $0 [-u|--upload] -c <CONFIG_S3_PATH> [-p|--profile <PROFILE>] [-h|--help]"
+  echo "Usage: $0 [-u|--upload] -c <CONFIG_S3_PATH> [-p|--profile <PROFILE>] [-cb|--codebuild] [-h|--help]"
   echo
   echo "Options:"
   echo "  -u, --upload           Upload the configuration file to S3 before downloading it."
@@ -18,6 +19,8 @@ function show_help {
   echo "                         Specify the S3 path for the configuration file."
   echo "  -p <PROFILE>, --profile <PROFILE>"
   echo "                         Specify the AWS profile to use (optional)."
+  echo "  -cb, --codebuild"
+  echo "                         Whether running on codebuild project."
   echo "  -h, --help             Show this help message and exit."
   echo
   exit 0
@@ -66,6 +69,11 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
+    -cb|--codebuild)
+    CODEBUILD_FLAG=true  # Set the codebuild flag to true
+    shift
+    shift
+    ;;  
     -h|--help)
       show_help  # Display help and exit
       ;;
@@ -98,7 +106,11 @@ fi
 
 # Download the configuration file from S3
 echo "Downloading '$CONFIG_LOCAL_PATH' from S3 path '$CONFIG_S3_PATH'..."
-aws s3 cp "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH" --profile "$PROFILE"
+if [[ "$CODEBUILD_FLAG" == true ]]; then
+  aws s3 cp "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH"
+else
+  aws s3 cp "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH" --profile "$PROFILE"
+fi
 
 # Navigate to the infrastructure directory
 pushd $SCRIPT_DIR/../infrastructure
@@ -116,5 +128,9 @@ popd
 yarn install --frozen-lockfile
 yarn lint
 yarn build
-yarn cdk synth --parameter projectConfigPath="$CONFIG_S3_PATH" --profile "$PROFILE" --verbose > template.yml
+if [[ "$CODEBUILD_FLAG" == true ]]; then
+  yarn cdk synth --parameter projectConfigPath="$CONFIG_S3_PATH" --verbose > template.yml
+else
+  yarn cdk synth --parameter projectConfigPath="$CONFIG_S3_PATH" --profile "$PROFILE" --verbose > template.yml
+fi
 popd
