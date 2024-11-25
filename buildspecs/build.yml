@@ -21,7 +21,7 @@ phases:
 
   build:
     commands:
-      - bash scripts/ci.sh --config "$CONFIG_S3_PATH"
+      - bash scripts/ci.sh -c "$CONFIG_S3_PATH" 
       - bash scripts/build_deploy.sh
       - bash scripts/docker_build_push.sh \
         --trigger-repo "$TRIGGER_REPOSITORY_ID" \
