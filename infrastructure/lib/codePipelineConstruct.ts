@@ -56,7 +56,9 @@ export class CodePipelineConstruct extends Construct {
 
         const sourceMLCodeOutput = new codepipeline.Artifact('SourceMLCodeOutput');
         const sourceCDKCodeOutput = new codepipeline.Artifact('SourceCDKCodeOutput');
-        const sourceDataOutput = new codepipeline.Artifact('SourceDataOutput');
+        const sourceDataBeltAOutput = new codepipeline.Artifact('SourceDataBeltAOutput');
+        const sourceDataBeltBOutput = new codepipeline.Artifact('SourceDataBeltBOutput');
+        const sourceDataBeltCOutput = new codepipeline.Artifact('SourceDataBeltCOutput');
         const buildOutputCDK = new codepipeline.Artifact('BuildOutputCDK');
         const buildOutputML = new codepipeline.Artifact('BuildOutputML');
         const pipelineOutput = new codepipeline.Artifact('PipelineOutput');
@@ -80,17 +82,31 @@ export class CodePipelineConstruct extends Construct {
         });
 
         //Source Data
-        const sourceData = new codepipeline_actions.S3SourceAction({
-            actionName: 'SourceData',
-            output: sourceDataOutput,
+        const sourceDataBeltA = new codepipeline_actions.S3SourceAction({
+            actionName: 'SourceDataBeltA',
+            output: sourceDataBeltAOutput,
             bucket: props.dataManifestBucket,
-            bucketKey: 'manifest.json.zip',
-            trigger: codepipeline_actions.S3Trigger.EVENTS,
+            bucketKey: 'manifest-A_type.json.zip',
+            trigger: codepipeline_actions.S3Trigger.POLL,
+        });
+        const sourceDataBeltB = new codepipeline_actions.S3SourceAction({
+            actionName: 'SourceDataBeltB',
+            output: sourceDataBeltBOutput,
+            bucket: props.dataManifestBucket,
+            bucketKey: 'manifest-B_type.json.zip',
+            trigger: codepipeline_actions.S3Trigger.POLL,
+        });
+        const sourceDataBeltC = new codepipeline_actions.S3SourceAction({
+            actionName: 'SourceDataBeltC',
+            output: sourceDataBeltCOutput,
+            bucket: props.dataManifestBucket,
+            bucketKey: 'manifest-C_type.json.zip',
+            trigger: codepipeline_actions.S3Trigger.POLL,
         });
 
         this.pipeline.addStage({
             stageName: 'Source',
-            actions: [sourceCDKCode, sourceMLCode, sourceData],
+            actions: [sourceCDKCode, sourceMLCode, sourceDataBeltA, sourceDataBeltB, sourceDataBeltC],
         });
         console.log(`props.gitML.pushFilter: ${props.gitML.pushFilter}`);
         this.pipeline.addTrigger({
@@ -148,7 +164,7 @@ export class CodePipelineConstruct extends Construct {
             actionName: 'CIBuild',
             project: buildProject,
             input: sourceCDKCodeOutput,
-            extraInputs: [sourceMLCodeOutput, sourceDataOutput],
+            extraInputs: [sourceMLCodeOutput, sourceDataBeltAOutput],
             outputs: [buildOutputCDK, buildOutputML],
             environmentVariables: {
                 CONFIG_S3_PATH: {
