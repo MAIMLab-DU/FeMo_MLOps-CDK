@@ -51,7 +51,7 @@ export class CodePipelineConstruct extends Construct {
 
         this.pipeline = new codepipeline.Pipeline(this, 'MLOpsPipeline', {
             pipelineType: codepipeline.PipelineType.V2,
-            executionMode: codepipeline.ExecutionMode.PARALLEL,
+            executionMode: codepipeline.ExecutionMode.QUEUED,
         });
 
         const sourceMLCodeOutput = new codepipeline.Artifact('SourceMLCodeOutput');
