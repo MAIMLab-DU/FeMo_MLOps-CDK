@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT-0
-import { Stack, StackProps, CfnOutput } from 'aws-cdk-lib';
+import { Stack, StackProps, CfnOutput, CfnParameter } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { CodePipelineConstruct, CodePipelineConstructPropsBase } from './codePipelineConstruct';
 import { DataSourceConstruct, DataSourceConstructProps } from './dataSourceConstruct';
@@ -11,6 +11,12 @@ export type InfrastractureStackProps = CodePipelineConstructPropsBase & StackPro
 export class InfrastractureStack extends Stack {
     constructor(scope: Construct, id: string, props: InfrastractureStackProps) {
         super(scope, id, props);
+
+        const projectConfigPath = new CfnParameter(this, 'projectConfigPath', {
+            type: 'String',
+            allowedPattern: '^s3://.*\\.json$',
+            description: 'The S3 path to the project configuration file. Muste be JSON file.',
+        });
 
         const dataSource = new DataSourceConstruct(this, 'DataSource', {
             ...props,
@@ -24,6 +30,7 @@ export class InfrastractureStack extends Stack {
 
         const codePipeline = new CodePipelineConstruct(this, 'CodePipeline', {
             ...props,
+            projectConfigPath: projectConfigPath.valueAsString,
             dataManifestBucket: dataSource.dataManifestBucket,
             ecrRepo: ecrRepos.ecrRepository,
             sageMakerArtifactBucket: sageMaker.sagemakerArtifactBucket,
@@ -33,32 +40,32 @@ export class InfrastractureStack extends Stack {
 
         new CfnOutput(this, 'CodePipelineOutput', {
             value: codePipeline.pipeline.pipelineName,
-            exportName: `${props.projectName}-CodePipeline`,
+            exportName: `${Stack.of(this).stackName}-CodePipeline`,
         });
 
         new CfnOutput(this, 'DataBucketOutput', {
             value: dataSource.dataBucket.bucketName,
-            exportName: `${props.projectName}-DataBucket`,
+            exportName: `${Stack.of(this).stackName}-DataBucket`,
         });
 
         new CfnOutput(this, 'EcrRepositoryOutput', {
             value: ecrRepos.ecrRepository.repositoryArn,
-            exportName: `${props.projectName}-EcrRepository`,
+            exportName: `${Stack.of(this).stackName}-EcrRepository`,
         });
 
         new CfnOutput(this, 'DataManifestBucketOutput', {
-            value: dataSource.dataManifestBucket.bucketArn,
-            exportName: `${props.projectName}-DataManifestBucket`,
+            value: dataSource.dataManifestBucket.bucketName,
+            exportName: `${Stack.of(this).stackName}-DataManifestBucket`,
         });
 
         new CfnOutput(this, 'SageMakerArtifactBucketOutput', {
-            value: sageMaker.sagemakerArtifactBucket.bucketArn,
-            exportName: `${props.projectName}-SageMakerArtifactBucket`,
+            value: sageMaker.sagemakerArtifactBucket.bucketName,
+            exportName: `${Stack.of(this).stackName}-SageMakerArtifactBucket`,
         });
 
         new CfnOutput(this, 'SageMakerExecutionRoleOutput', {
             value: sageMaker.sagemakerExecutionRole.roleArn,
-            exportName: `${props.projectName}-SageMakerExecutionRole`,
+            exportName: `${Stack.of(this).stackName}-SageMakerExecutionRole`,
         });
     }
 }

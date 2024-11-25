@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT-0
 import { Stack } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
+// import { GitConfiguration } from 'aws-cdk-lib/aws-codepipeline';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -15,6 +16,7 @@ export type CodePipelineConstructPropsBase = {
 } & CodePipelineConstructPropsGithubSource;
 
 export type CodePipelineConstructProps = {
+    readonly projectConfigPath: string;
     readonly dataManifestBucket: s3.Bucket;
     readonly ecrRepo: ecr.Repository;
     readonly sageMakerArtifactBucket: s3.Bucket;
@@ -23,20 +25,19 @@ export type CodePipelineConstructProps = {
 
 export interface CodePipelineConstructPropsGithubSource {
     readonly repoType: 'git';
-    readonly ciBucketName: string;
     readonly gitML: {
         readonly githubConnectionArn: string;
         readonly githubRepoOwner: string;
         readonly githubRepoName: string;
         readonly githubRepoBranch?: string;
-        readonly triggerOnPush?: boolean;
+        readonly pushFilter: Array<{ tagsExcludes?: string[]; tagsIncludes: string[] }>;
     };
     readonly gitCDK: {
         readonly githubConnectionArn: string;
         readonly githubRepoOwner: string;
         readonly githubRepoName: string;
         readonly githubRepoBranch?: string;
-        readonly triggerOnPush?: boolean;
+        readonly pushFilter: Array<{ tagsExcludes?: string[]; tagsIncludes: string[] }>;
     };
 }
 
@@ -67,7 +68,6 @@ export class CodePipelineConstruct extends Construct {
             repo: props.gitML.githubRepoName,
             branch: props.gitML.githubRepoBranch || 'main',
             connectionArn: props.gitML.githubConnectionArn,
-            triggerOnPush: props.gitML.triggerOnPush || false,
         });
         const sourceCDKCode = new codepipeline_actions.CodeStarConnectionsSourceAction({
             actionName: 'SourceCDKCode',
@@ -76,7 +76,6 @@ export class CodePipelineConstruct extends Construct {
             repo: props.gitCDK.githubRepoName,
             branch: props.gitCDK.githubRepoBranch || 'main',
             connectionArn: props.gitCDK.githubConnectionArn,
-            triggerOnPush: props.gitCDK.triggerOnPush || false,
         });
 
         //Source Data
@@ -92,28 +91,19 @@ export class CodePipelineConstruct extends Construct {
             stageName: 'Source',
             actions: [sourceCDKCode, sourceMLCode, sourceData],
         });
+        console.log(`props.gitML.pushFilter: ${props.gitML.pushFilter}`);
         this.pipeline.addTrigger({
             providerType: codepipeline.ProviderType.CODE_STAR_SOURCE_CONNECTION,
             gitConfiguration: {
                 sourceAction: sourceMLCode,
-                pushFilter: [
-                    {
-                        tagsExcludes: ['v0.*.*', 'v*.*.*-alpha'],
-                        tagsIncludes: ['v*.*.*'],
-                    },
-                ],
+                pushFilter: props.gitML.pushFilter,
             },
         });
         this.pipeline.addTrigger({
             providerType: codepipeline.ProviderType.CODE_STAR_SOURCE_CONNECTION,
             gitConfiguration: {
                 sourceAction: sourceCDKCode,
-                pushFilter: [
-                    {
-                        tagsExcludes: ['v0.*.*', 'v*.*.*-alpha'],
-                        tagsIncludes: ['v*.*.*'],
-                    },
-                ],
+                pushFilter: props.gitCDK.pushFilter,
             },
         });
 
@@ -141,6 +131,13 @@ export class CodePipelineConstruct extends Construct {
 
         buildProject.addToRolePolicy(
             new iam.PolicyStatement({
+                actions: ['s3:GetObject'],
+                resources: ['*'],
+            })
+        );
+
+        buildProject.addToRolePolicy(
+            new iam.PolicyStatement({
                 actions: ['codepipeline:ListPipelineExecutions'],
                 resources: [`arn:aws:codepipeline:${Stack.of(this).region}:${Stack.of(this).account}:*`],
             })
@@ -153,9 +150,9 @@ export class CodePipelineConstruct extends Construct {
             extraInputs: [sourceMLCodeOutput, sourceDataOutput],
             outputs: [buildOutputCDK, buildOutputML],
             environmentVariables: {
-                S3_CIBUCKET: {
+                CONFIG_S3_PATH: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: props.ciBucketName,
+                    value: props.projectConfigPath,
                 },
                 AWS_DEFAULT_REGION: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
@@ -165,7 +162,7 @@ export class CodePipelineConstruct extends Construct {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: Stack.of(this).account,
                 },
-                ML_REPO_CONNECTION: {
+                ML_REPOSITORY_ID: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: `${props.gitML.githubRepoOwner}/${props.gitML.githubRepoName}`,
                 },

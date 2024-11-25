@@ -14,7 +14,6 @@ new InfrastractureStack(app, `${projectConfig.projectName}-MLOpsInfraStack`, {
     projectName: projectConfig.projectName,
     repoType: 'git',
     existingDataBucketName: projectConfig.dataBucketName,
-    ciBucketName: projectConfig.ciBucketName,
     triggerPeriod: projectConfig.triggerPeriod,
     minNumberOfFiles: projectConfig.minNumberofFiles,
     sageMakerForceExtractFeatures: projectConfig.forceExtractFeatures,
