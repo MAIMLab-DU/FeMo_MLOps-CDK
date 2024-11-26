@@ -16,18 +16,11 @@ phases:
       - echo Logging in to Amazon ECR...
       - docker login -u AWS -p $(aws ecr get-login-password --region $AWS_DEFAULT_REGION) $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com > /dev/null 2>&1
       - export PIPELINE_NAME=`echo $CODEBUILD_INITIATOR | cut -c14-`
-      - export TRIGGER_REPOSITORY_ID=$(aws codepipeline list-pipeline-executions --pipeline-name $PIPELINE_NAME --max-results 1 | jq -r ".pipelineExecutionSummaries[].trigger.triggerDetail | fromjson? | .repositoryId // empty")
-      - export TRIGGER_TAG=$(aws codepipeline list-pipeline-executions --pipeline-name $PIPELINE_NAME --max-results 1 | jq -r ".pipelineExecutionSummaries[].trigger.triggerDetail | fromjson? | .tagName // empty")
 
   build:
     commands:
       - bash scripts/ci.sh -c "$CONFIG_S3_PATH"
-      - bash scripts/build_deploy.sh
-      - bash scripts/docker_build_push.sh \
-        --trigger-repo "$TRIGGER_REPOSITORY_ID" \
-        --ml-repo "$ML_REPOSITORY_ID" \
-        --trigger-tag "$TRIGGER_TAG" \
-        --ecr-repo "$ECR_REPOSITORY_NAME"
+      - bash scripts/docker_build_push.sh -c "$PIPELINE_NAME" -e "$ECR_REPOSITORY_NAME"
       - bash scripts/copy_data_manifest.sh
 
 artifacts:

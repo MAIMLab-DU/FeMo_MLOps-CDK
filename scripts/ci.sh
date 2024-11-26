@@ -31,7 +31,7 @@ function upload_to_s3 {
   if [[ -n "$PROFILE" ]]; then
     REMOTE_ETAG=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" --query "ETag" --profile "$PROFILE" --output text 2>/dev/null | tr -d '"')
   else
-    REMOTE_ETAG=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" --query "ETag" --output text 2>/dev/null | tr -d '*')
+    REMOTE_ETAG=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" --query "ETag" --output text 2>/dev/null | tr -d '"')
   fi
 
   # Check if the file exists in S3
@@ -51,7 +51,11 @@ function upload_to_s3 {
   # Compare and upload only if different
   if [[ "$REMOTE_ETAG" != "$LOCAL_MD5" ]]; then
     echo "Uploading modified object to S3..."
-    aws s3 cp "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
+    if [[ -n "$PROFILE" ]]; then
+      aws s3 cp "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
+    else
+      aws s3 cp "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH"
+    fi
   else
     echo "No changes detected. Skipping upload."
   fi
@@ -127,7 +131,7 @@ popd
 yarn install --frozen-lockfile
 yarn lint
 yarn build
-if [[ -n "$PROFILE" ]]; then 
+if [[ -n "$PROFILE" ]]; then
   yarn cdk synth --parameter projectConfigPath="$CONFIG_S3_PATH" --profile "$PROFILE" --verbose > template.yml
 else
   yarn cdk synth --parameter projectConfigPath="$CONFIG_S3_PATH" --verbose > template.yml

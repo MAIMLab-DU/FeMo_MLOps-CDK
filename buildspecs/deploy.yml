@@ -13,6 +13,7 @@ phases:
 
   build:
     commands:
+      - bash scripts/build_deploy.sh
       - bash scripts/deploy.sh
 
 artifacts:
