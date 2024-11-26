@@ -86,21 +86,21 @@ export class CodePipelineConstruct extends Construct {
             actionName: 'SourceDataBeltA',
             output: sourceDataBeltAOutput,
             bucket: props.dataManifestBucket,
-            bucketKey: 'manifest-A_type.json.zip',
+            bucketKey: 'manifest-A.json.zip',
             trigger: codepipeline_actions.S3Trigger.POLL,
         });
         const sourceDataBeltB = new codepipeline_actions.S3SourceAction({
             actionName: 'SourceDataBeltB',
             output: sourceDataBeltBOutput,
             bucket: props.dataManifestBucket,
-            bucketKey: 'manifest-B_type.json.zip',
+            bucketKey: 'manifest-B.json.zip',
             trigger: codepipeline_actions.S3Trigger.POLL,
         });
         const sourceDataBeltC = new codepipeline_actions.S3SourceAction({
             actionName: 'SourceDataBeltC',
             output: sourceDataBeltCOutput,
             bucket: props.dataManifestBucket,
-            bucketKey: 'manifest-C_type.json.zip',
+            bucketKey: 'manifest-C.json.zip',
             trigger: codepipeline_actions.S3Trigger.POLL,
         });
 

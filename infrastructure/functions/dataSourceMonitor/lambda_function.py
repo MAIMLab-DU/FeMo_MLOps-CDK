@@ -1,9 +1,11 @@
 import json
 import time
 import os
+import re
 import boto3
 import tempfile
 import zipfile
+from typing import Literal
 from datetime import datetime
 from botocore.exceptions import ClientError
 
@@ -14,7 +16,11 @@ MANIFEST_BUCKET_NAME = os.environ.get('DATA_MANIFEST_BUCKET_NAME', '')
 
 def list_objects_by_belt_type(bucket_name):
     """Group objects by belt type from folder structure `<beltType>/<deviceId>/<logfile.dat>`."""
-    grouped_objects = {}
+    grouped_objects = {
+        'A': [],
+        'B': [],
+        'C': []
+    }
     continuation_token = None
     
     try:
@@ -34,8 +40,12 @@ def list_objects_by_belt_type(bucket_name):
                     continue
                 
                 belt_type, device_id, file_name = parts[0], parts[1], parts[2]
-                if belt_type not in grouped_objects:
-                    grouped_objects[belt_type] = []
+                # Validate belt_type format
+                if not re.match(r"^[ABC]_type$", belt_type):
+                    print(f"Skipping invalid belt_type format: {belt_type} in file path: {key}")
+                    continue
+                
+                belt_type: Literal['A', 'B', 'C'] = belt_type.split('_type')[0]
                 grouped_objects[belt_type].append({
                     "deviceId": device_id,
                     "fileName": file_name,
@@ -167,10 +177,9 @@ def lambda_handler(event, context):
                 upload_manifest_to_s3(manifest, belt_type)
             
             # Sleep added to ensure queueing of Codepipeline execution
-            if len(grouped_objects) > 1:          
+            if len(grouped_objects) > 1:        
                 time.sleep(10)
 
     except Exception as e:
         print(f"Error in Lambda execution: {e}")
         raise e
-
