@@ -73,15 +73,12 @@ def build_manifest(previous_manifest=None, all_objects=None, belt_type=None):
 
     # Handle the case where there are no previous manifests
     if previous_manifest is None:
-        if not all_objects or len(all_objects) == 0:
-            return None
-        else:
-            current_manifest = {
-                "version": version,
-                "beltType": belt_type,
-                "lastNumObjects": len(all_objects),
-                "items": all_objects
-            }
+        current_manifest = {
+            "version": version,
+            "beltType": belt_type,
+            "lastNumObjects": len(all_objects),
+            "items": all_objects
+        }
     else:
         # Compare the difference in object count
         difference = len(all_objects) - previous_manifest['lastNumObjects']
@@ -177,7 +174,7 @@ def lambda_handler(event, context):
                 upload_manifest_to_s3(manifest, belt_type)
             
             # Sleep added to ensure queueing of Codepipeline execution
-            if len(grouped_objects) > 1:        
+            if len(grouped_objects) > 1 and len(items) > 0:        
                 time.sleep(10)
 
     except Exception as e:
