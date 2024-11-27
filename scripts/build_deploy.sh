@@ -15,5 +15,5 @@ deactivate
 yarn install --frozen-lockfile
 yarn lint
 yarn build
-yarn cdk synth
+yarn cdk synth --verbose > template.yml
 popd
