@@ -22,6 +22,23 @@ phases:
       - bash scripts/ci.sh -c "$CONFIG_S3_PATH"
       - bash scripts/docker_build_push.sh -c "$PIPELINE_NAME" -e "$ECR_REPOSITORY_NAME"
       - bash scripts/copy_data_manifest.sh
+      - |
+          if [[ -z "$ITEMS_COUNT" ]]; then
+            echo "Error: ITEMS_COUNT environment variable is not set."
+            exit 1
+          fi
+          
+          if [[ "$ITEMS_COUNT" -le 0 ]]; then
+            echo "Items array is empty, stopping pipeline execution."
+            CODEPIPELINE_EXECUTION_ID=$(aws codepipeline list-pipeline-executions --pipeline-name "$PIPELINE_NAME" --max-results 1 | jq -r ".pipelineExecutionSummaries[].pipelineExecutionId")
+            aws codepipeline stop-pipeline-execution \
+              --pipeline-name "$PIPELINE_NAME" \
+              --pipeline-execution-id "$CODEPIPELINE_EXECUTION_ID" \
+              --region "$AWS_DEFAULT_REGION" \
+              --reason "Items array is empty in manifest."
+            exit 0
+          fi
+      - echo "Items array is valid, proceeding with MLPipeline steps..."
 
 artifacts:
   files:

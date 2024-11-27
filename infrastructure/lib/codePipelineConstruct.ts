@@ -155,7 +155,7 @@ export class CodePipelineConstruct extends Construct {
 
         buildProject.addToRolePolicy(
             new iam.PolicyStatement({
-                actions: ['codepipeline:ListPipelineExecutions'],
+                actions: ['codepipeline:ListPipelineExecutions', 'codepipeline:StopPipelineExecution'],
                 resources: [`arn:aws:codepipeline:${Stack.of(this).region}:${Stack.of(this).account}:*`],
             })
         );
