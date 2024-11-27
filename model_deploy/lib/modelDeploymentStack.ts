@@ -18,7 +18,6 @@ export interface ModelDeploymentStackProps extends StackProps {
     projectName: string;
     customDomainName?: string;
     acmCertificateArn?: string;
-    apiStage?: 'dev' | 'prod';
 }
 
 export class ModelDeploymentStack extends Stack {
@@ -153,7 +152,6 @@ export class ModelDeploymentStack extends Stack {
             inferenceResultTable: inferenceResultTable,
             customDomainName: props.customDomainName,
             acmCertificateArn: props.acmCertificateArn,
-            apiStage: props.apiStage ?? 'dev',
         });
 
         apiConstruct.node.addDependency(endpoint);
