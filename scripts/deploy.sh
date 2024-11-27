@@ -41,37 +41,60 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Resolve pipeline name if it contains a wildcard
+if [[ "$pipeline_name" == *"*"* ]]; then    
+    # Fetch the list of pipelines
+    pipelines=$(aws codepipeline list-pipelines --query "pipelines[?contains(name, '${pipeline_name//\*/}')].name" --output text)
+    
+    if [[ -z "$pipelines" ]]; then
+        echo "Error: No pipeline names match the pattern: $pipeline_name"
+        exit 1
+    fi
+    
+    # Check if there are multiple matches
+    pipeline_count=$(echo "$pipelines" | wc -l)
+    if [[ "$pipeline_count" -gt 1 ]]; then
+        echo "Error: Multiple pipelines match the pattern: $pipeline_name"
+        echo "Matched pipelines:"
+        echo "$pipelines"
+        exit 1
+    fi
+    
+    # Use the resolved pipeline name
+    pipeline_name="$pipelines"
+    echo "Resolved pipeline name: $pipeline_name"
+fi
+
 pushd ./model_deploy
 echo 'Installing dependencies'
 yarn install --check-files
 
 if [[ -z "$pipeline_name" ]]; then
-
     model_package_name=$(cat ${CODEBUILD_SRC_DIR_PipelineOutput}/pipelineExecution.json | jq ".arn" -r)
     echo MODEL_PACKAGE_NAME=${model_package_name}
 else
-    
     action_name="MLPipeline"
+    
     # Get the latest execution ID of the pipeline
     execution_id=$(aws codepipeline list-pipeline-executions \
         --pipeline-name "$pipeline_name" \
         --max-results 1 | jq -r ".pipelineExecutionSummaries[].pipelineExecutionId // empty")
 
     if [[ -z "$execution_id" ]]; then
-    echo "No executions found for pipeline: $pipeline_name"
-    exit 1
+        echo "No executions found for pipeline: $pipeline_name"
+        exit 1
     fi
 
     # Get details of the stage's output artifacts for the latest execution
     output=$(aws codepipeline list-action-executions \
-    --pipeline-name "$pipeline_name" \
-    --filter pipelineExecutionId="$execution_id" \
-    --no-paginate \
-    --query "actionExecutionDetails[?actionName=='MLPipeline'].output[].outputArtifacts[]")
+        --pipeline-name "$pipeline_name" \
+        --filter pipelineExecutionId="$execution_id" \
+        --no-paginate \
+        --query "actionExecutionDetails[?actionName=='MLPipeline'].output[].outputArtifacts[]")
 
     if [[ "$output" == "[]" ]]; then
-    echo "No output artifacts found for stage: $action_name in execution: $execution_id"
-    exit 1
+        echo "No output artifacts found for stage: $action_name in execution: $execution_id"
+        exit 1
     fi
 
     # Parse and download artifact
@@ -80,15 +103,15 @@ else
 
     # Check if the file exists
     if [[ ! -f artifact.zip ]]; then
-    echo "Error: Artifact zip file was not downloaded."
-    exit 1
+        echo "Error: Artifact zip file was not downloaded."
+        exit 1
     fi
     unzip -o -q artifact.zip 'pipelineExecution.json'
 
     # Check for extraction errors
     if [[ $? -ne 0 ]]; then
-    echo "Error: Failed to extract files from artifact.zip."
-    exit 1
+        echo "Error: Failed to extract files from artifact.zip."
+        exit 1
     fi
     rm artifact.zip
 
