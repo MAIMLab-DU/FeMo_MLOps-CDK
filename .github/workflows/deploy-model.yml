@@ -49,13 +49,13 @@ jobs:
             bash scripts/create_aws_profile.sh -p "${{ secrets.DEV_AWS_PROFILE }}" -i "${{ secrets.DEV_ACCESS_KEY_ID }}" -k "${{ secrets.DEV_SECRET_ACCESS_KEY }}" -r "${{ secrets.DEV_REGION }}"
             echo "${{ secrets.DEV_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
             projectName=$(cat ./configuration/projectConfig.json | jq -r ".projectName")
-            bash scripts/build_deploy.sh
+            bash scripts/build_deploy.sh -p "${{ secrets.DEV_AWS_PROFILE }}"
             bash scripts/deploy.sh -c "${projectName}-MLOpsInfraStack-*" -p "${{ secrets.DEV_AWS_PROFILE }}"
           elif [[ "${{ github.ref_name }}" == "main" ]]; then
             bash scripts/create_aws_profile.sh -p "${{ secrets.PROD_AWS_PROFILE }}" -i "${{ secrets.PROD_ACCESS_KEY_ID }}" -k "${{ secrets.PROD_SECRET_ACCESS_KEY }}" -r "${{ secrets.PROD_REGION }}"
             echo "${{ secrets.PROD_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
             projectName=$(cat ./configuration/projectConfig.json | jq -r ".projectName")
-            bash scripts/build_deploy.sh
+            bash scripts/build_deploy.sh -p "${{ secrets.PROD_AWS_PROFILE }}"
             bash scripts/deploy.sh -c "${projectName}-MLOpsInfraStack-*" -p "${{ secrets.PROD_AWS_PROFILE }}"
           else
             echo "Unsupported branch: ${{ github.ref_name }}"
