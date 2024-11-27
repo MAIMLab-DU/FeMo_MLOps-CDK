@@ -84,7 +84,8 @@ else
         execution_id=$(aws codepipeline list-pipeline-executions \
             --pipeline-name "$pipeline_name" \
             --max-results 1 | jq -r ".pipelineExecutionSummaries[].pipelineExecutionId // empty")
-
+    fi
+    
     if [[ -z "$execution_id" ]]; then
         echo "No executions found for pipeline: $pipeline_name"
         exit 1
@@ -103,6 +104,7 @@ else
             --filter pipelineExecutionId="$execution_id" \
             --no-paginate \
             --query "actionExecutionDetails[?actionName=='MLPipeline'].output[].outputArtifacts[]")
+    fi
 
     if [[ "$output" == "[]" ]]; then
         echo "No output artifacts found for stage: $action_name in execution: $execution_id"
