@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT-0
-import { Stack } from 'aws-cdk-lib';
+import { Duration, Stack } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 // import { GitConfiguration } from 'aws-cdk-lib/aws-codepipeline';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
@@ -250,6 +250,7 @@ export class CodePipelineConstruct extends Construct {
 
         const mlPipelineProject = new codebuild.PipelineProject(this, 'MLPipeline', {
             buildSpec: codebuild.BuildSpec.fromSourceFilename('./buildspecs/pipeline.yml'),
+            timeout: Duration.hours(14),
             role: mlPipelineRole,
             environment: {
                 buildImage: codebuild.LinuxBuildImage.STANDARD_6_0,

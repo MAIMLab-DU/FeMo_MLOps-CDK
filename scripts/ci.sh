@@ -38,9 +38,9 @@ function upload_to_s3 {
   if [[ -z "$REMOTE_ETAG" ]]; then
     echo "No existing object found in S3. Uploading..."
     if [[ -n "$PROFILE" ]]; then
-      aws s3 cp "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
+      aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
     else
-      aws s3 cp "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH"
+      aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH"
     fi
     return
   fi
@@ -52,9 +52,9 @@ function upload_to_s3 {
   if [[ "$REMOTE_ETAG" != "$LOCAL_MD5" ]]; then
     echo "Uploading modified object to S3..."
     if [[ -n "$PROFILE" ]]; then
-      aws s3 cp "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
+      aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
     else
-      aws s3 cp "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH"
+      aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH"
     fi
   else
     echo "No changes detected. Skipping upload."
@@ -110,9 +110,9 @@ fi
 # Download the configuration file from S3
 echo "Downloading '$CONFIG_LOCAL_PATH' from S3 path '$CONFIG_S3_PATH'..."
 if [[ -n "$PROFILE" ]]; then
-  aws s3 cp "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH" --profile "$PROFILE"
+  aws s3 cp --quiet "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH" --profile "$PROFILE"
 else
-  aws s3 cp "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH"
+  aws s3 cp --quiet "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH"
 fi
 
 # Navigate to the infrastructure directory
