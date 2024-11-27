@@ -44,7 +44,11 @@ done
 # Resolve pipeline name if it contains a wildcard
 if [[ "$pipeline_name" == *"*"* ]]; then    
     # Fetch the list of pipelines
-    pipelines=$(aws codepipeline list-pipelines --query "pipelines[?contains(name, '${pipeline_name//\*/}')].name" --output text)
+    if [[ -n "$profile" ]]; then
+        pipelines=$(aws codepipeline list-pipelines --profile "$profile" --query "pipelines[?contains(name, '${pipeline_name//\*/}')].name" --output text)
+    else
+        pipelines=$(aws codepipeline list-pipelines --query "pipelines[?contains(name, '${pipeline_name//\*/}')].name" --output text)
+    fi
     
     if [[ -z "$pipelines" ]]; then
         echo "Error: No pipeline names match the pattern: $pipeline_name"
@@ -85,7 +89,7 @@ else
             --pipeline-name "$pipeline_name" \
             --max-results 1 | jq -r ".pipelineExecutionSummaries[].pipelineExecutionId // empty")
     fi
-    
+
     if [[ -z "$execution_id" ]]; then
         echo "No executions found for pipeline: $pipeline_name"
         exit 1
