@@ -69,7 +69,7 @@ jobs:
 
       # Create AWS Profile
       - name: Deploy CDK Stack to AWS
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
           pushd ./infrastructure
           if [[ "${{ github.ref_name }}" == "dev" ]]; then

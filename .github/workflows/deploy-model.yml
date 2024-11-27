@@ -69,7 +69,7 @@ jobs:
 
       # Create AWS Profile
       - name: Deploy Latest Model to AWS
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
           projectName=$(cat ./configuration/projectConfig.json | jq -r ".projectName")
           if [[ "${{ github.ref_name }}" == "dev" ]]; then
