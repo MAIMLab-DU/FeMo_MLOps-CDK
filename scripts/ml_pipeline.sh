@@ -26,7 +26,7 @@ if [[ -z "$codepipeline_name" ]]; then
 fi
 
 # Fetch trigger detail
-trigger_detail=$(aws codepipeline list-pipeline-executions --pipeline-name "$codepipeline_name" --max-results 4 | jq -r ".pipelineExecutionSummaries[3].trigger.triggerDetail")
+trigger_detail=$(aws codepipeline list-pipeline-executions --pipeline-name "$codepipeline_name" --max-results 1 | jq -r ".pipelineExecutionSummaries[].trigger.triggerDetail")
 echo "triggerDetail: $trigger_detail"
 
 cd $CODEBUILD_SRC_DIR_BuildOutputML/aws_sagemaker/
@@ -34,13 +34,16 @@ cd $CODEBUILD_SRC_DIR_BuildOutputML/aws_sagemaker/
 if [[ "$trigger_detail" == "SourceDataBeltA" ]]; then
     echo "Running sagemaker pipeline for Belt Type A ....."
     bash run_pipeline.sh --belt-type "A"
+
 elif [[ "$trigger_detail" == "SourceDataBeltB" ]]; then
     echo "Running sagemaker pipeline for Belt Type B ....."
     bash run_pipeline.sh --belt-type "B"
+
 elif [[ "$trigger_detail" == "SourceDataBeltC" ]]; then
     echo "Running sagemaker pipeline for Belt Type C ....."
     bash run_pipeline.sh --belt-type "C"
-elif echo "$trigger_detail" | jq -e 'has("repositoryId")' > /dev/null 2>&1; then
+
+else
     trigger_repository_id=$(echo "$trigger_detail" | jq -r ".repositoryId")
     echo "Pipeline triggered by code change in: $trigger_repository_id"
     # Array of belt types
@@ -56,7 +59,4 @@ elif echo "$trigger_detail" | jq -e 'has("repositoryId")' > /dev/null 2>&1; then
         fi
     done
     echo "Pipeline execution completed for all belt types."
-else
-    echo "Invalid trigger detail: $trigger_detail"
-    exit 1
 fi
