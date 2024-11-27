@@ -76,9 +76,14 @@ else
     action_name="MLPipeline"
     
     # Get the latest execution ID of the pipeline
-    execution_id=$(aws codepipeline list-pipeline-executions \
-        --pipeline-name "$pipeline_name" \
-        --max-results 1 | jq -r ".pipelineExecutionSummaries[].pipelineExecutionId // empty")
+    if [[ -n "$profile" ]]; then
+        execution_id=$(aws codepipeline list-pipeline-executions --profile "$profile" \
+            --pipeline-name "$pipeline_name" \
+            --max-results 1 | jq -r ".pipelineExecutionSummaries[].pipelineExecutionId // empty")
+    else
+        execution_id=$(aws codepipeline list-pipeline-executions \
+            --pipeline-name "$pipeline_name" \
+            --max-results 1 | jq -r ".pipelineExecutionSummaries[].pipelineExecutionId // empty")
 
     if [[ -z "$execution_id" ]]; then
         echo "No executions found for pipeline: $pipeline_name"
@@ -86,11 +91,18 @@ else
     fi
 
     # Get details of the stage's output artifacts for the latest execution
-    output=$(aws codepipeline list-action-executions \
-        --pipeline-name "$pipeline_name" \
-        --filter pipelineExecutionId="$execution_id" \
-        --no-paginate \
-        --query "actionExecutionDetails[?actionName=='MLPipeline'].output[].outputArtifacts[]")
+    if [[ -n "$profile" ]]; then
+        output=$(aws codepipeline list-action-executions --profile "$profile" \
+            --pipeline-name "$pipeline_name" \
+            --filter pipelineExecutionId="$execution_id" \
+            --no-paginate \
+            --query "actionExecutionDetails[?actionName=='MLPipeline'].output[].outputArtifacts[]")
+    else
+        output=$(aws codepipeline list-action-executions \
+            --pipeline-name "$pipeline_name" \
+            --filter pipelineExecutionId="$execution_id" \
+            --no-paginate \
+            --query "actionExecutionDetails[?actionName=='MLPipeline'].output[].outputArtifacts[]")
 
     if [[ "$output" == "[]" ]]; then
         echo "No output artifacts found for stage: $action_name in execution: $execution_id"
@@ -99,7 +111,11 @@ else
 
     # Parse and download artifact
     artifact_s3_path=$(echo "$output" | jq -r '.[] | "s3://\(.s3location.bucket)/\(.s3location.key)"')
-    aws s3 cp --quiet "$artifact_s3_path" artifact.zip
+    if [[ -n "$profile" ]]; then
+        aws s3 cp --quiet "$artifact_s3_path" artifact.zip --profile "$profile"
+    else
+        aws s3 cp --quiet "$artifact_s3_path" artifact.zip
+    fi
 
     # Check if the file exists
     if [[ ! -f artifact.zip ]]; then
@@ -121,7 +137,7 @@ fi
 
 echo 'Deploying Model in your AWS account'
 if [[ -n "$profile" ]]; then
-    yarn cdk deploy --require-approval never --parameters modelPackageName=${model_package_name} --profile $profile --app cdk.out/
+    yarn cdk deploy --require-approval never --parameters modelPackageName=${model_package_name} --profile "$profile" --app cdk.out/
 else
     yarn cdk deploy --require-approval never --parameters modelPackageName=${model_package_name} --app cdk.out/
 fi

@@ -2,6 +2,7 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 profile=""
 
 # Usage function
@@ -36,7 +37,7 @@ done
 
 # Build the Model deployment package
 
-pushd model_deploy
+pushd $SCRIPT_DIR/../model_deploy
 
 python3 -m venv .venv
 source .venv/bin/activate
