@@ -8,9 +8,16 @@ on:
       - dev
     paths:
       - infrastructure/**
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - infrastructure/**
+      - .github/workflows/**
 
 jobs:
   deploy-stack:
+    if: github.event.repository.fork == false
     runs-on: ubuntu-latest
 
     steps:
@@ -32,7 +39,7 @@ jobs:
       - name: Install AWS CLI v2
         run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
+          unzip -q awscliv2.zip
           sudo ./aws/install --update
           aws --version
 
@@ -41,21 +48,36 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
-      # Create AWS Profile
-      - name: Deploy CDK Stack to AWS
+        
+      # CI check
+      - name: CI check
         run: |
           if [[ "${{ github.ref_name }}" == "dev" ]]; then
             bash scripts/create_aws_profile.sh -p "${{ secrets.DEV_AWS_PROFILE }}" -i "${{ secrets.DEV_ACCESS_KEY_ID }}" -k "${{ secrets.DEV_SECRET_ACCESS_KEY }}" -r "${{ secrets.DEV_REGION }}"
             echo "${{ secrets.DEV_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
             bash scripts/ci.sh -c "${{ secrets.DEV_CONFIG_PATH }}" -p "${{ secrets.DEV_AWS_PROFILE }}" --upload
-            cd infrastructure/
-            yarn cdk deploy --require-approval never --parameters projectConfigPath="${{ secrets.DEV_CONFIG_PATH }}" --profile "${{ secrets.DEV_AWS_PROFILE }}" --app cdk.out/
+
           elif [[ "${{ github.ref_name }}" == "main" ]]; then
             bash scripts/create_aws_profile.sh -p "${{ secrets.PROD_AWS_PROFILE }}" -i "${{ secrets.PROD_ACCESS_KEY_ID }}" -k "${{ secrets.PROD_SECRET_ACCESS_KEY }}" -r "${{ secrets.PROD_REGION }}"
             echo "${{ secrets.PROD_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
             bash scripts/ci.sh -c "${{ secrets.PROD_CONFIG_PATH }}" -p "${{ secrets.PROD_AWS_PROFILE }}" --upload
-            yarn cdk deploy --parameters projectConfigPath="${{ secrets.PROD_CONFIG_PATH }}" --profile "${{ secrets.PROD_AWS_PROFILE }}"
+
+          else
+            echo "Unsupported branch: ${{ github.ref_name }}"
+            exit 1
+          fi
+
+      # Create AWS Profile
+      - name: Deploy CDK Stack to AWS
+        if: github.event_name == 'push'
+        run: |
+          pushd ./infrastructure
+          if [[ "${{ github.ref_name }}" == "dev" ]]; then
+            yarn cdk deploy --require-approval never --parameters projectConfigPath="${{ secrets.DEV_CONFIG_PATH }}" --profile "${{ secrets.DEV_AWS_PROFILE }}" --app cdk.out/
+
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            yarn cdk deploy --require-approval never --parameters projectConfigPath="${{ secrets.PROD_CONFIG_PATH }}" --profile "${{ secrets.PROD_AWS_PROFILE }}" --app cdk.out/
+
           else
             echo "Unsupported branch: ${{ github.ref_name }}"
             exit 1

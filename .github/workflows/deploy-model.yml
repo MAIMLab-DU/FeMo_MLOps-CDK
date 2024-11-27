@@ -7,10 +7,17 @@ on:
       - main
       - dev
     paths:
-      - model_deploy/**
+      - infrastructure/**
+  pull_request:
+    branches:
+      - dev
+    paths:
+      - infrastructure/**
+      - .github/workflows/**
 
 jobs:
   deploy-stack:
+    if: github.event.repository.fork == false
     runs-on: ubuntu-latest
 
     steps:
@@ -26,13 +33,13 @@ jobs:
 
       # Install Yarn if not globally available
       - name: Install Yarn
-        run: npm install -g yarn      
+        run: npm install -g yarn
 
       # Install AWS CLI v2
       - name: Install AWS CLI v2
         run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
+          unzip -q awscliv2.zip
           sudo ./aws/install --update
           aws --version
 
@@ -41,22 +48,36 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
-      # Create AWS Profile
-      - name: Deploy Latest Model to AWS
+        
+      # CI check
+      - name: Build Deployment Stack
         run: |
           if [[ "${{ github.ref_name }}" == "dev" ]]; then
             bash scripts/create_aws_profile.sh -p "${{ secrets.DEV_AWS_PROFILE }}" -i "${{ secrets.DEV_ACCESS_KEY_ID }}" -k "${{ secrets.DEV_SECRET_ACCESS_KEY }}" -r "${{ secrets.DEV_REGION }}"
             echo "${{ secrets.DEV_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
-            projectName=$(cat ./configuration/projectConfig.json | jq -r ".projectName")
             bash scripts/build_deploy.sh -p "${{ secrets.DEV_AWS_PROFILE }}"
-            bash scripts/deploy.sh -c "${projectName}-MLOpsInfraStack-*" -p "${{ secrets.DEV_AWS_PROFILE }}"
+
           elif [[ "${{ github.ref_name }}" == "main" ]]; then
             bash scripts/create_aws_profile.sh -p "${{ secrets.PROD_AWS_PROFILE }}" -i "${{ secrets.PROD_ACCESS_KEY_ID }}" -k "${{ secrets.PROD_SECRET_ACCESS_KEY }}" -r "${{ secrets.PROD_REGION }}"
             echo "${{ secrets.PROD_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
-            projectName=$(cat ./configuration/projectConfig.json | jq -r ".projectName")
             bash scripts/build_deploy.sh -p "${{ secrets.PROD_AWS_PROFILE }}"
+
+          else
+            echo "Unsupported branch: ${{ github.ref_name }}"
+            exit 1
+          fi
+
+      # Create AWS Profile
+      - name: Deploy Latest Model to AWS
+        if: github.event_name == 'push'
+        run: |
+          projectName=$(cat ./configuration/projectConfig.json | jq -r ".projectName")
+          if [[ "${{ github.ref_name }}" == "dev" ]]; then
+            bash scripts/deploy.sh -c "${projectName}-MLOpsInfraStack-*" -p "${{ secrets.DEV_AWS_PROFILE }}"
+
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
             bash scripts/deploy.sh -c "${projectName}-MLOpsInfraStack-*" -p "${{ secrets.PROD_AWS_PROFILE }}"
+
           else
             echo "Unsupported branch: ${{ github.ref_name }}"
             exit 1
