@@ -10,7 +10,7 @@ usage() {
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --codepipeline-name)
+        -c|--codepipeline-name)
             codepipeline_name="$2"
             shift 2
             ;;
@@ -29,30 +29,48 @@ fi
 trigger_detail=$(aws codepipeline list-pipeline-executions --pipeline-name "$codepipeline_name" --max-results 1 | jq -r ".pipelineExecutionSummaries[].trigger.triggerDetail")
 echo "triggerDetail: $trigger_detail"
 
-cd $CODEBUILD_SRC_DIR_BuildOutputML/aws_sagemaker/
-# Handle trigger details
-if [[ "$trigger_detail" == "SourceDataBeltA" ]]; then
-    echo "Running sagemaker pipeline for Belt Type A ....."
-    bash run_pipeline.sh --belt-type "A"
+cd $CODEBUILD_SRC_DIR_BuildOutputML
+case "$trigger_detail" in
+    SourceDataBeltA)
+        manifest_file="$CODEBUILD_SRC_DIR_BuildOutputML/configs/dataManifest_beltA.json"
+        ;;
+    SourceDataBeltB)
+        manifest_file="$CODEBUILD_SRC_DIR_BuildOutputML/configs/dataManifest_beltB.json"
+        ;;
+    SourceDataBeltC)
+        manifest_file="$CODEBUILD_SRC_DIR_BuildOutputML/configs/dataManifest_beltC.json"
+        ;;
+esac
 
-elif [[ "$trigger_detail" == "SourceDataBeltB" ]]; then
-    echo "Running sagemaker pipeline for Belt Type B ....."
-    bash run_pipeline.sh --belt-type "B"
+items_count=$(jq '.items | length' "$manifest_file")
+if [[ "$items_count" -le 0 ]]; then
+    echo "Items array is empty, stopping pipeline execution."
+    execution_id=$(aws codepipeline list-pipeline-executions --pipeline-name "$codepipeline_name" --max-results 1 | jq -r ".pipelineExecutionSummaries[].pipelineExecutionId")
+    aws codepipeline stop-pipeline-execution \
+        --pipeline-name "$codepipeline_name" \
+        --pipeline-execution-id "$execution_id" \
+        --region "$AWS_DEFAULT_REGION" \
+        --reason "Items array is empty in manifest."
+    exit 0
+fi
+bash aws_sagemaker/run_pipeline.sh --manifest-file $manifest_file
 
-elif [[ "$trigger_detail" == "SourceDataBeltC" ]]; then
-    echo "Running sagemaker pipeline for Belt Type C ....."
-    bash run_pipeline.sh --belt-type "C"
-
-else
-    trigger_repository_id=$(echo "$trigger_detail" | jq -r ".repositoryId")
+trigger_repository_id=$(echo "$trigger_detail" | jq -r ".repositoryId // empty")
+if [[ -n $trigger_repository_id ]]; then
     echo "Pipeline triggered by code change in: $trigger_repository_id"
-    # Array of belt types
     belt_types=("A" "B" "C")
 
     # Loop through each belt type and execute the script
     for belt_type in "${belt_types[@]}"; do
+        manifest_file="$CODEBUILD_SRC_DIR_BuildOutputML/configs/dataManifest_belt$belt_type.json"
+        items_count=$(jq '.items | length' "$manifest_file")
+        if [[ "$items_count" -le 0 ]]; then
+            echo "Items array is empty, skipping pipeline run for Belt Type: $belt_type"
+            continue
+        fi
+
         echo "Running sagemaker pipeline for Belt Type: $belt_type"
-        bash run_pipeline.sh --belt-type "$belt_type"
+        bash aws_sagemaker/run_pipeline.sh --manifest-file $manifest_file
         if [[ $? -ne 0 ]]; then
             echo "Error occurred while running pipeline for Belt Type: $belt_type"
             exit 1

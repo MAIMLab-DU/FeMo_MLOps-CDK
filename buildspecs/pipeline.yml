@@ -15,9 +15,9 @@ phases:
 
   build:
     commands:
-      - bash scripts/ml_pipeline.sh --codepipeline-name "$PIPELINE_NAME"
+      - bash scripts/ml_pipeline.sh -c "$PIPELINE_NAME"
 
 artifacts:
   base-directory: $CODEBUILD_SRC_DIR_BuildOutputML/aws_sagemaker
   files:
-    - 'pipelineExecution.json'
+    - 'pipelineExecution_belt*.json'

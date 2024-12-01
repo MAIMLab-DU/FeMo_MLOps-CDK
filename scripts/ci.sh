@@ -2,11 +2,11 @@
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_LOCAL_PATH="configuration/projectConfig.json"
+config_local_path="configuration/projectConfig.json"
 
-UPLOAD_FLAG=false
-CONFIG_S3_PATH=""
-PROFILE=""
+upload_flag=false
+config_s3_path=""
+profile=""
 
 # Function to display help
 function show_help {
@@ -25,36 +25,36 @@ function show_help {
 
 function upload_to_s3 {
   # Extract bucket name and object key from CONFIG_S3_PATH
-  bucket_name=$(echo "$CONFIG_S3_PATH" | cut -d'/' -f3)
-  object_key=$(echo "$CONFIG_S3_PATH" | cut -d'/' -f4-)
+  bucket_name=$(echo "$config_s3_path" | cut -d'/' -f3)
+  object_key=$(echo "$config_s3_path" | cut -d'/' -f4-)
   # Get current ETag from S3
-  if [[ -n "$PROFILE" ]]; then
-    REMOTE_ETAG=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" --query "ETag" --profile "$PROFILE" --output text 2>/dev/null | tr -d '"')
+  if [[ -n "$profile" ]]; then
+    remote_tag=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" --query "ETag" --profile "$profile" --output text 2>/dev/null | tr -d '"')
   else
-    REMOTE_ETAG=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" --query "ETag" --output text 2>/dev/null | tr -d '"')
+    remote_tag=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" --query "ETag" --output text 2>/dev/null | tr -d '"')
   fi
 
   # Check if the file exists in S3
-  if [[ -z "$REMOTE_ETAG" ]]; then
+  if [[ -z "$remote_tag" ]]; then
     echo "No existing object found in S3. Uploading..."
-    if [[ -n "$PROFILE" ]]; then
-      aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
+    if [[ -n "$profile" ]]; then
+      aws s3 cp --quiet "$config_local_path" "$config_s3_path" --profile "$profile"
     else
-      aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH"
+      aws s3 cp --quiet "$config_local_path" "$config_s3_path"
     fi
     return
   fi
 
   # Calculate MD5 checksum of the local file
-  LOCAL_MD5=$(md5sum "$CONFIG_LOCAL_PATH" | awk '{print $1}')
+  local_md5=$(md5sum "$config_local_path" | awk '{print $1}')
 
   # Compare and upload only if different
-  if [[ "$REMOTE_ETAG" != "$LOCAL_MD5" ]]; then
+  if [[ "$remote_tag" != "$local_md5" ]]; then
     echo "Uploading modified object to S3..."
-    if [[ -n "$PROFILE" ]]; then
-      aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
+    if [[ -n "$profile" ]]; then
+      aws s3 cp --quiet "$config_local_path" "$config_s3_path" --profile "$profile"
     else
-      aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH"
+      aws s3 cp --quiet "$config_local_path" "$config_s3_path"
     fi
   else
     echo "No changes detected. Skipping upload."
@@ -65,16 +65,16 @@ function upload_to_s3 {
 while [[ $# -gt 0 ]]; do
   case $1 in
     -u|--upload)
-      UPLOAD_FLAG=true  # Set the upload flag to true
+      upload_flag=true  # Set the upload flag to true
       shift
       ;;
     -c|--config-s3-path)
-      CONFIG_S3_PATH="$2"  # Set CONFIG_S3_PATH to the next argument
+      config_s3_path="$2"  # Set CONFIG_S3_PATH to the next argument
       shift
       shift
       ;;
     -p|--profile)
-      PROFILE="$2"  # Set PROFILE to the next argument
+      profile="$2"  # Set PROFILE to the next argument
       shift
       shift
       ;;
@@ -90,29 +90,29 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate that CONFIG_S3_PATH and ENVIRONMENT are provided
-if [[ -z "$CONFIG_S3_PATH" ]]; then
+if [[ -z "$config_s3_path" ]]; then
   echo "Error: CONFIG_S3_PATH must be specified with -c or --config-s3-path." >&2
   echo "Use -h or --help for usage information."
   exit 1
 fi
 
 # Validate CONFIG_S3_PATH format
-if [[ ! "$CONFIG_S3_PATH" =~ ^s3://[^/]+/.+\.json$ ]]; then
+if [[ ! "$config_s3_path" =~ ^s3://[^/]+/.+\.json$ ]]; then
   echo "Error: CONFIG_S3_PATH must be in the format 's3://bucket/key.json'"
   exit 1
 fi
 
 # If upload flag is set, upload the $S3_KEY file to S3
-if [[ "$UPLOAD_FLAG" == true ]]; then
+if [[ "$upload_flag" == true ]]; then
   upload_to_s3
 fi
 
 # Download the configuration file from S3
-echo "Downloading '$CONFIG_LOCAL_PATH' from S3 path '$CONFIG_S3_PATH'..."
-if [[ -n "$PROFILE" ]]; then
-  aws s3 cp --quiet "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH" --profile "$PROFILE"
+echo "Downloading '$config_local_path' from S3 path '$config_s3_path'..."
+if [[ -n "$profile" ]]; then
+  aws s3 cp --quiet "$config_s3_path" "$config_local_path" --profile "$profile"
 else
-  aws s3 cp --quiet "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH"
+  aws s3 cp --quiet "$config_s3_path" "$config_local_path"
 fi
 
 # Navigate to the infrastructure directory
@@ -131,9 +131,9 @@ popd
 yarn install --frozen-lockfile
 yarn lint
 yarn build
-if [[ -n "$PROFILE" ]]; then
-  yarn cdk synth --parameter projectConfigPath="$CONFIG_S3_PATH" --profile "$PROFILE" --verbose > template.yml
+if [[ -n "$profile" ]]; then
+  yarn cdk synth --parameter projectConfigPath="$config_s3_path" --profile "$profile" --verbose > template.yml
 else
-  yarn cdk synth --parameter projectConfigPath="$CONFIG_S3_PATH" --verbose > template.yml
+  yarn cdk synth --parameter projectConfigPath="$config_s3_path" --verbose > template.yml
 fi
 popd

@@ -48,13 +48,13 @@ fi
 # Set CODEBUILD_SRC_DIR_<source-name> based on belt_type
 case "$belt_type" in
     A)
-        manifest_file="$CODEBUILD_SRC_DIR_SourceDataOutputBeltA/manifest-A.json"
+        manifest_file="$CODEBUILD_SRC_DIR_SourceDataBeltAOutput/manifest-A.json"
         ;;
     B)
-        manifest_file="$CODEBUILD_SRC_DIR_SourceDataOutputBeltB/manifest-B.json"
+        manifest_file="$CODEBUILD_SRC_DIR_SourceDataBeltBOutput/manifest-B.json"
         ;;
     C)
-        manifest_file="$CODEBUILD_SRC_DIR_SourceDataOutputBeltC/manifest-C.json"
+        manifest_file="$CODEBUILD_SRC_DIR_SourceDataBeltCOutput/manifest-C.json"
         ;;
 esac
 
@@ -64,11 +64,5 @@ if [[ ! -f "$manifest_file" ]]; then
     exit 1
 fi
 
-# Check if 'items' array in the manifest file has a length greater than 0
-items_count=$(jq '.items | length' "$manifest_file")
-export ITEMS_COUNT="$items_count"
-
-echo "The 'items' array in the manifest file contains $items_count items."
-
-cat ${manifest_file} > ${CODEBUILD_SRC_DIR_SourceMLCodeOutput}/configs/dataManifest.json
+cat ${manifest_file} > ${CODEBUILD_SRC_DIR_SourceMLCodeOutput}/configs/dataManifest_belt${belt_type}.json
 echo "Copied Data Manifest for beltType '$belt_type' to ML Pipeline Source folder"
