@@ -12,9 +12,9 @@ import * as path from 'path';
 
 export interface InferencApiConstructProps {
     readonly ipCIDRBlocks: string[];
-    readonly sageMakeEndpointArnBeltA: string;
-    readonly sageMakeEndpointArnBeltB: string;
-    readonly sageMakeEndpointArnBeltC: string;
+    readonly sageMakerEndpointArnBeltA: string;
+    readonly sageMakerEndpointArnBeltB: string;
+    readonly sageMakerEndpointArnBeltC: string;
     readonly sageMakerEndpointNameBeltA: string;
     readonly sageMakerEndpointNameBeltB: string;
     readonly sageMakerEndpointNameBeltC: string;
@@ -105,9 +105,9 @@ export class InferenceApiConstruct extends Construct {
                 Effect: 'Allow',
                 Action: ['sagemaker:InvokeEndpoint'],
                 Resource: [
-                    props.sageMakeEndpointArnBeltA,
-                    props.sageMakeEndpointArnBeltB,
-                    props.sageMakeEndpointArnBeltC,
+                    props.sageMakerEndpointArnBeltA,
+                    props.sageMakerEndpointArnBeltB,
+                    props.sageMakerEndpointArnBeltC,
                 ],
             })
         );

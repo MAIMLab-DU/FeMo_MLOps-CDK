@@ -64,8 +64,13 @@ if [[ -n $trigger_repository_id ]]; then
     for belt_type in "${belt_types[@]}"; do
         manifest_file="$CODEBUILD_SRC_DIR_BuildOutputML/configs/dataManifest_belt$belt_type.json"
         items_count=$(jq '.items | length' "$manifest_file")
+        
         if [[ "$items_count" -le 0 ]]; then
-            echo "Items array is empty, skipping pipeline run for Belt Type: $belt_type"
+            echo "Items array is empty, skipping pipeline run for Belt Type: $belt_type"            
+            # Create JSON file with {"arn": "None"}
+            output_file="aws_sagemaker/pipelineExecution_belt$belt_type.json"
+            echo '{"arn": "None"}' > "$output_file"
+            
             continue
         fi
 

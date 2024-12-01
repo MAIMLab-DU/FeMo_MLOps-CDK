@@ -74,8 +74,9 @@ echo 'Installing dependencies'
 yarn install --check-files
 
 if [[ -z "$pipeline_name" ]]; then
-    model_package_name=$(cat ${CODEBUILD_SRC_DIR_PipelineOutput}/pipelineExecution.json | jq ".arn" -r)
-    echo MODEL_PACKAGE_NAME=${model_package_name}
+    model_package_name_beltA=$(cat ${CODEBUILD_SRC_DIR_PipelineOutput}/pipelineExecution_beltA.json | jq ".arn" -r)
+    model_package_name_beltB=$(cat ${CODEBUILD_SRC_DIR_PipelineOutput}/pipelineExecution_beltB.json | jq ".arn" -r)
+    model_package_name_beltC=$(cat ${CODEBUILD_SRC_DIR_PipelineOutput}/pipelineExecution_beltC.json | jq ".arn" -r)
 else
     action_name="MLPipeline"
     
@@ -128,7 +129,7 @@ else
         echo "Error: Artifact zip file was not downloaded."
         exit 1
     fi
-    unzip -o -q artifact.zip 'pipelineExecution.json'
+    unzip -o -q artifact.zip
 
     # Check for extraction errors
     if [[ $? -ne 0 ]]; then
@@ -137,14 +138,15 @@ else
     fi
     rm artifact.zip
 
-    model_package_name=$(cat pipelineExecution.json | jq ".arn" -r)
-    echo MODEL_PACKAGE_NAME=${model_package_name}
+    model_package_name_beltA=$(cat pipelineExecution_beltA.json | jq ".arn" -r)
+    model_package_name_beltB=$(cat pipelineExecution_beltB.json | jq ".arn" -r)
+    model_package_name_beltC=$(cat pipelineExecution_beltC.json | jq ".arn" -r)
 fi
 
 echo 'Deploying Model in your AWS account'
 if [[ -n "$profile" ]]; then
-    yarn cdk deploy --require-approval never --parameters modelPackageName=${model_package_name} --profile "$profile" --app cdk.out/
+    yarn cdk deploy --require-approval never --parameters modelPackageNameBeltA=${model_package_name_beltA} modelPackageNameBeltB=${model_package_name_beltB} modelPackageNameBeltC=${model_package_name_beltC} --profile "$profile" --app cdk.out/
 else
-    yarn cdk deploy --require-approval never --parameters modelPackageName=${model_package_name} --app cdk.out/
+    yarn cdk deploy --require-approval never --parameters modelPackageNameBeltA=${model_package_name_beltA} modelPackageNameBeltB=${model_package_name_beltB} modelPackageNameBeltC=${model_package_name_beltC} --app cdk.out/
 fi
 popd
