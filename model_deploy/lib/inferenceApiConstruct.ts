@@ -12,8 +12,12 @@ import * as path from 'path';
 
 export interface InferencApiConstructProps {
     readonly ipCIDRBlocks: string[];
-    readonly sageMakeEndpointArn: string;
-    readonly sageMakerEndpointName: string;
+    readonly sageMakeEndpointArnBeltA: string;
+    readonly sageMakeEndpointArnBeltB: string;
+    readonly sageMakeEndpointArnBeltC: string;
+    readonly sageMakerEndpointNameBeltA: string;
+    readonly sageMakerEndpointNameBeltB: string;
+    readonly sageMakerEndpointNameBeltC: string;
     readonly inferenceResultTable: dynamodb.Table;
     readonly customDomainName?: string; // Optional custom domain name
     readonly acmCertificateArn?: string; // Optional ACM certificate ARN
@@ -38,8 +42,12 @@ export class InferenceApiConstruct extends Construct {
                 reEval: {
                     type: apigateway.JsonSchemaType.BOOLEAN,
                 },
+                beltType: {
+                    type: apigateway.JsonSchemaType.STRING,
+                    enum: ['A', 'B', 'C'], // Allowed values for beltType
+                },
             },
-            required: ['s3Key'], // Specify required properties
+            required: ['s3Key', 'beltType'],
             additionalProperties: false,
         };
 
@@ -96,7 +104,11 @@ export class InferenceApiConstruct extends Construct {
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: ['sagemaker:InvokeEndpoint'],
-                Resource: [props.sageMakeEndpointArn],
+                Resource: [
+                    props.sageMakeEndpointArnBeltA,
+                    props.sageMakeEndpointArnBeltB,
+                    props.sageMakeEndpointArnBeltC,
+                ],
             })
         );
 
@@ -109,7 +121,9 @@ export class InferenceApiConstruct extends Construct {
             timeout: Duration.minutes(1),
             role: inferenceApiFunctionRole,
             environment: {
-                SAGEMAKER_ENDPOINT_NAME: props.sageMakerEndpointName,
+                SAGEMAKER_ENDPOINT_NAME_BELT_A: props.sageMakerEndpointNameBeltA,
+                SAGEMAKER_ENDPOINT_NAME_BELT_B: props.sageMakerEndpointNameBeltB,
+                SAGEMAKER_ENDPOINT_NAME_BELT_C: props.sageMakerEndpointNameBeltC,
                 DYNAMODB_TABLE_NAME: props.inferenceResultTable.tableName,
             },
         });
