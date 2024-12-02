@@ -208,6 +208,13 @@ export class CodePipelineConstruct extends Construct {
         );
 
         mlPipelineRole.addToPolicy(
+            new iam.PolicyStatement({
+                actions: ['codepipeline:ListPipelineExecutions', 'codepipeline:StopPipelineExecution'],
+                resources: [`arn:aws:codepipeline:${Stack.of(this).region}:${Stack.of(this).account}:*`],
+            })
+        );
+
+        mlPipelineRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: [
@@ -221,12 +228,7 @@ export class CodePipelineConstruct extends Construct {
                     'sagemaker:ListPipelineExecutionSteps',
                 ],
                 Resource: [
-                    `arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:pipeline/${
-                        props.projectName
-                    }`,
-                    `arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:pipeline/${
-                        props.projectName
-                    }/*`,
+                    `arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:pipeline/*`,
                 ],
             })
         );
