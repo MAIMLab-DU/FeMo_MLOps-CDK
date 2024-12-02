@@ -37,7 +37,7 @@ if [[ "$trigger_detail" == "SourceDataBeltA" ]]; then
     bash $SCRIPT_DIR/copy_data_manifest.sh --belt-type "A"
 
 elif [[ "$trigger_detail" == "SourceDataBeltB" ]]; then
-    bash $SCRIPT_DIR/run_pipeline.sh --belt-type "B"
+    bash $SCRIPT_DIR/copy_data_manifest.sh --belt-type "B"
 
 elif [[ "$trigger_detail" == "SourceDataBeltC" ]]; then
     bash $SCRIPT_DIR/copy_data_manifest.sh --belt-type "C"
