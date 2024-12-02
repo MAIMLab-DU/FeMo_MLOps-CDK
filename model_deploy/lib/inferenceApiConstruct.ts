@@ -104,11 +104,7 @@ export class InferenceApiConstruct extends Construct {
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: ['sagemaker:InvokeEndpoint'],
-                Resource: [
-                    props.sageMakerEndpointArnBeltA,
-                    props.sageMakerEndpointArnBeltB,
-                    props.sageMakerEndpointArnBeltC,
-                ],
+                Resource: ['*'],
             })
         );
 

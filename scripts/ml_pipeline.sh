@@ -29,7 +29,8 @@ fi
 trigger_detail=$(aws codepipeline list-pipeline-executions --pipeline-name "$codepipeline_name" --max-results 1 | jq -r ".pipelineExecutionSummaries[].trigger.triggerDetail")
 echo "triggerDetail: $trigger_detail"
 
-cd $CODEBUILD_SRC_DIR_BuildOutputML
+# shellcheck disable=SC2154
+cd "$CODEBUILD_SRC_DIR_BuildOutputML"
 case "$trigger_detail" in
     SourceDataBeltA)
         manifest_file="$CODEBUILD_SRC_DIR_BuildOutputML/configs/dataManifest_beltA.json"
@@ -53,7 +54,7 @@ if [[ "$items_count" -le 0 ]]; then
         --reason "Items array is empty in manifest."
     exit 0
 fi
-bash aws_sagemaker/run_pipeline.sh --manifest-file $manifest_file
+bash aws_sagemaker/run_pipeline.sh --manifest-file "$manifest_file"
 
 trigger_repository_id=$(echo "$trigger_detail" | jq -r ".repositoryId // empty")
 if [[ -n $trigger_repository_id ]]; then
@@ -66,16 +67,15 @@ if [[ -n $trigger_repository_id ]]; then
         items_count=$(jq '.items | length' "$manifest_file")
         
         if [[ "$items_count" -le 0 ]]; then
-            echo "Items array is empty, skipping pipeline run for Belt Type: $belt_type"            
-            # Create JSON file with {"arn": "None"}
+            echo "Items array is empty, skipping pipeline run for Belt Type: $belt_type"
             output_file="aws_sagemaker/pipelineExecution_belt$belt_type.json"
-            echo '{"arn": "None"}' > "$output_file"
+            echo '{"arn": "NotTrained"}' > "$output_file"
             
             continue
         fi
 
         echo "Running sagemaker pipeline for Belt Type: $belt_type"
-        bash aws_sagemaker/run_pipeline.sh --manifest-file $manifest_file
+        bash aws_sagemaker/run_pipeline.sh --manifest-file "$manifest_file"
         if [[ $? -ne 0 ]]; then
             echo "Error occurred while running pipeline for Belt Type: $belt_type"
             exit 1

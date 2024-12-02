@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT-0
 import { Construct } from 'constructs';
-import { Stack, StackProps, CfnParameter, CfnCondition, Fn, CustomResource, CfnOutput, Duration } from 'aws-cdk-lib';
+import { Stack, StackProps, CfnParameter, CustomResource, Fn, CfnOutput, Duration, CfnCondition } from 'aws-cdk-lib';
 import { InferenceApiConstruct } from './inferenceApiConstruct';
 import * as path from 'path';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -38,35 +38,23 @@ export class ModelDeploymentStack extends Stack {
             pointInTimeRecovery: true,
         });
 
-        // Add a Global Secondary Index for jobId
         inferenceResultTable.addGlobalSecondaryIndex({
-            indexName: 'JobIdIndex', // Name of the GSI
-            partitionKey: { name: 'jobId', type: dynamodb.AttributeType.STRING }, // GSI partition key
-            projectionType: dynamodb.ProjectionType.ALL, // Include all attributes in the index
+            indexName: 'JobIdIndex',
+            partitionKey: { name: 'jobId', type: dynamodb.AttributeType.STRING },
+            projectionType: dynamodb.ProjectionType.ALL,
         });
 
         const modelPackageNameBeltA = new CfnParameter(this, 'modelPackageNameBeltA', {
             type: 'String',
-            default: 'None',
+            default: 'NotTrained',
         });
         const modelPackageNameBeltB = new CfnParameter(this, 'modelPackageNameBeltB', {
             type: 'String',
-            default: 'None',
+            default: 'NotTrained',
         });
         const modelPackageNameBeltC = new CfnParameter(this, 'modelPackageNameBeltC', {
             type: 'String',
-            default: 'None',
-        });
-
-        // Add a condition for each modelPackageName
-        const modelPackageNameBeltACondition = new CfnCondition(this, 'ModelPackageNameBeltACondition', {
-            expression: Fn.conditionNot(Fn.conditionEquals(modelPackageNameBeltA.valueAsString, 'None')),
-        });
-        const modelPackageNameBeltBCondition = new CfnCondition(this, 'ModelPackageNameBeltBCondition', {
-            expression: Fn.conditionNot(Fn.conditionEquals(modelPackageNameBeltB.valueAsString, 'None')),
-        });
-        const modelPackageNameBeltCCondition = new CfnCondition(this, 'ModelPackageNameBeltCCondition', {
-            expression: Fn.conditionNot(Fn.conditionEquals(modelPackageNameBeltC.valueAsString, 'None')),
+            default: 'NotTrained',
         });
 
         const executionRole = new iam.Role(this, 'SageMakerModelExecutionRole', {
@@ -95,25 +83,11 @@ export class ModelDeploymentStack extends Stack {
             managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole')],
         });
 
-        const resources: string[] = [
-            `arn:aws:sagemaker:${this.region}:${this.account}:model/${props.projectName}*`, // Base resource pattern
-        ];
-
-        if (modelPackageNameBeltA.valueAsString !== 'None') {
-            resources.push(modelPackageNameBeltA.valueAsString);
-        }
-        if (modelPackageNameBeltB.valueAsString !== 'None') {
-            resources.push(modelPackageNameBeltB.valueAsString);
-        }
-        if (modelPackageNameBeltC.valueAsString !== 'None') {
-            resources.push(modelPackageNameBeltC.valueAsString);
-        }
-
         inferenceModelFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: ['sagemaker:CreateModel', 'sagemaker:DeleteModel', 'sagemaker:DescribeModelPackage'],
-                Resource: resources,
+                Resource: ['*'],
             })
         );
 
@@ -126,8 +100,8 @@ export class ModelDeploymentStack extends Stack {
         );
 
         const inferenceModelFunction = new lambda.Function(this, 'InferenceModelFunction', {
-            runtime: lambda.Runtime.PYTHON_3_10, // Use Python 3.10 runtime
-            handler: 'lambda_function.lambda_handler', // Python handler defined as 'filename.function_name'
+            runtime: lambda.Runtime.PYTHON_3_10,
+            handler: 'lambda_function.lambda_handler',
             code: lambda.Code.fromAsset(path.join(__dirname, '../customResources/inferenceModel'), {
                 exclude: ['.venv', '.ruff_cache', '.pytest_cache', '*.pyc', '__pycache__'],
             }),
@@ -144,139 +118,80 @@ export class ModelDeploymentStack extends Stack {
             }
         );
 
-        const inferenceModelCustomResourceBeltA = new CustomResource(this, 'InferenceModelCustomResourceBeltA', {
-            serviceToken: inferenceModelCustomResourceProvider.serviceToken,
-            properties: {
-                modelPackageName: modelPackageNameBeltA.valueAsString,
-                sagemakerExecutionRole: executionRole.roleArn,
-                projectName: props.projectName,
-                inferenceResultTable: inferenceResultTable.tableName,
-            },
-        });
-        const inferenceModelCustomResourceBeltB = new CustomResource(this, 'InferenceModelCustomResourceBeltB', {
-            serviceToken: inferenceModelCustomResourceProvider.serviceToken,
-            properties: {
-                modelPackageName: modelPackageNameBeltB.valueAsString,
-                sagemakerExecutionRole: executionRole.roleArn,
-                projectName: props.projectName,
-                inferenceResultTable: inferenceResultTable.tableName,
-            },
-        });
-        const inferenceModelCustomResourceBeltC = new CustomResource(this, 'InferenceModelCustomResourceBeltC', {
-            serviceToken: inferenceModelCustomResourceProvider.serviceToken,
-            properties: {
-                modelPackageName: modelPackageNameBeltC.valueAsString,
-                sagemakerExecutionRole: executionRole.roleArn,
-                projectName: props.projectName,
-                inferenceResultTable: inferenceResultTable.tableName,
-            },
-        });
+        const endpoints: { [key: string]: sagemaker.CfnEndpoint | undefined } = {};
 
-        inferenceModelCustomResourceBeltA.node.addDependency(executionRole);
-        inferenceModelCustomResourceBeltB.node.addDependency(executionRole);
-        inferenceModelCustomResourceBeltC.node.addDependency(executionRole);
+        const createEndpointForBelt = (belt: string, modelPackageName: CfnParameter) => {
+            const customResource = new CustomResource(this, `InferenceModelBelt${belt}`, {
+                serviceToken: inferenceModelCustomResourceProvider.serviceToken,
+                properties: {
+                    modelPackageName: modelPackageName.valueAsString,
+                    sagemakerExecutionRole: executionRole.roleArn,
+                    projectName: props.projectName,
+                    beltType: belt,
+                    inferenceResultTable: inferenceResultTable.tableName,
+                },
+            });
 
-        const endpointConfigBeltA = modelPackageNameBeltACondition.node.defaultChild
-            ? new sagemaker.CfnEndpointConfig(this, 'SageMakerModelEndpointConfigBeltA', {
-                  productionVariants: [
-                      {
-                          initialInstanceCount: props.endpointInstanceCount || 1,
-                          initialVariantWeight: 1.0,
-                          instanceType: props.endpointInstanceType || 'ml.c5.xlarge',
-                          modelName: inferenceModelCustomResourceBeltA.ref,
-                          variantName: 'AllTraffic',
-                      },
-                  ],
-              })
-            : undefined;
+            const isModelTrained = new CfnCondition(this, `IsModelTrainedBelt${belt}`, {
+                expression: Fn.conditionNot(Fn.conditionEquals(modelPackageName.valueAsString, 'NotTrained')),
+            });
 
-        const endpointConfigBeltB = modelPackageNameBeltBCondition.node.defaultChild
-            ? new sagemaker.CfnEndpointConfig(this, 'SageMakerModelEndpointConfigBeltB', {
-                  productionVariants: [
-                      {
-                          initialInstanceCount: props.endpointInstanceCount || 1,
-                          initialVariantWeight: 1.0,
-                          instanceType: props.endpointInstanceType || 'ml.c5.xlarge',
-                          modelName: inferenceModelCustomResourceBeltB.ref,
-                          variantName: 'AllTraffic',
-                      },
-                  ],
-              })
-            : undefined;
+            const endpointConfig = new sagemaker.CfnEndpointConfig(this, `EndpointConfigBelt${belt}`, {
+                productionVariants: [
+                    {
+                        initialInstanceCount: props.endpointInstanceCount || 1,
+                        initialVariantWeight: 1.0,
+                        instanceType: props.endpointInstanceType || 'ml.c5.xlarge',
+                        modelName: customResource.ref,
+                        variantName: 'AllTraffic',
+                    },
+                ],
+            });
+            endpointConfig.cfnOptions.condition = isModelTrained;
 
-        const endpointConfigBeltC = modelPackageNameBeltCCondition.node.defaultChild
-            ? new sagemaker.CfnEndpointConfig(this, 'SageMakerModelEndpointConfigBeltC', {
-                  productionVariants: [
-                      {
-                          initialInstanceCount: props.endpointInstanceCount || 1,
-                          initialVariantWeight: 1.0,
-                          instanceType: props.endpointInstanceType || 'ml.c5.xlarge',
-                          modelName: inferenceModelCustomResourceBeltC.ref,
-                          variantName: 'AllTraffic',
-                      },
-                  ],
-              })
-            : undefined;
+            const endpoint = new sagemaker.CfnEndpoint(this, `SageMakerModelEndpointBelt${belt}`, {
+                endpointConfigName: endpointConfig.getAtt('EndpointConfigName').toString(),
+            });
+            endpoint.cfnOptions.condition = isModelTrained;
 
-        if (endpointConfigBeltA) {
-            endpointConfigBeltA.node.addDependency(inferenceModelCustomResourceBeltA);
-        }
-        if (endpointConfigBeltB) {
-            endpointConfigBeltB.node.addDependency(inferenceModelCustomResourceBeltB);
-        }
-        if (endpointConfigBeltC) {
-            endpointConfigBeltC.node.addDependency(inferenceModelCustomResourceBeltC);
-        }
+            const endpointArn = Fn.conditionIf(isModelTrained.logicalId, endpoint.ref, 'NotTrained').toString();
+            const endpointName = Fn.conditionIf(
+                isModelTrained.logicalId,
+                endpoint.getAtt('EndpointName'),
+                'NotTrained'
+            ).toString();
 
-        const endpointBeltA = endpointConfigBeltA
-            ? new sagemaker.CfnEndpoint(this, 'SageMakerModelEndpointBeltA', {
-                  endpointConfigName: endpointConfigBeltA.getAtt('EndpointConfigName').toString(),
-              })
-            : undefined;
+            return { arn: endpointArn, name: endpointName, cfnOutput: customResource.ref };
+        };
 
-        const endpointBeltB = endpointConfigBeltB
-            ? new sagemaker.CfnEndpoint(this, 'SageMakerModelEndpointBeltB', {
-                  endpointConfigName: endpointConfigBeltB.getAtt('EndpointConfigName').toString(),
-              })
-            : undefined;
+        // Create endpoints conditionally based on the modelPackageName parameters
+        const endpointA = createEndpointForBelt('A', modelPackageNameBeltA);
+        const endpointB = createEndpointForBelt('B', modelPackageNameBeltB);
+        const endpointC = createEndpointForBelt('C', modelPackageNameBeltC);
 
-        const endpointBeltC = endpointConfigBeltC
-            ? new sagemaker.CfnEndpoint(this, 'SageMakerModelEndpointBeltC', {
-                  endpointConfigName: endpointConfigBeltC.getAtt('EndpointConfigName').toString(),
-              })
-            : undefined;
-
-        if (endpointBeltA && endpointConfigBeltA) {
-            endpointBeltA.node.addDependency(endpointConfigBeltA);
-        }
-        if (endpointBeltB && endpointConfigBeltB) {
-            endpointBeltB.node.addDependency(endpointConfigBeltB);
-        }
-        if (endpointBeltC && endpointConfigBeltC) {
-            endpointBeltC.node.addDependency(endpointConfigBeltC);
-        }
-
+        // Create the API construct with references to conditionally created endpoints
         const apiConstruct = new InferenceApiConstruct(this, 'InferenceAPIConstruct', {
             ipCIDRBlocks: props.ipPermitList,
-            sageMakerEndpointArnBeltA: endpointBeltA ? endpointBeltA.ref : 'None',
-            sageMakerEndpointArnBeltB: endpointBeltB ? endpointBeltB.ref : 'None',
-            sageMakerEndpointArnBeltC: endpointBeltC ? endpointBeltC.ref : 'None',
-            sageMakerEndpointNameBeltA: endpointBeltA ? endpointBeltA.getAtt('EndpointName').toString() : 'None',
-            sageMakerEndpointNameBeltB: endpointBeltB ? endpointBeltB.getAtt('EndpointName').toString() : 'None',
-            sageMakerEndpointNameBeltC: endpointBeltC ? endpointBeltC.getAtt('EndpointName').toString() : 'None',
+            sageMakerEndpointArnBeltA: endpointA.arn,
+            sageMakerEndpointArnBeltB: endpointB.arn,
+            sageMakerEndpointArnBeltC: endpointC.arn,
+            sageMakerEndpointNameBeltA: endpointA.name,
+            sageMakerEndpointNameBeltB: endpointB.name,
+            sageMakerEndpointNameBeltC: endpointC.name,
             inferenceResultTable: inferenceResultTable,
             customDomainName: props.customDomainName,
             acmCertificateArn: props.acmCertificateArn,
         });
 
-        if (endpointBeltA) {
-            apiConstruct.node.addDependency(endpointBeltA);
+        // Add dependencies to the API construct only for created endpoints
+        if (endpoints['A']) {
+            apiConstruct.node.addDependency(endpoints['A']);
         }
-        if (endpointBeltB) {
-            apiConstruct.node.addDependency(endpointBeltB);
+        if (endpoints['B']) {
+            apiConstruct.node.addDependency(endpoints['B']);
         }
-        if (endpointBeltC) {
-            apiConstruct.node.addDependency(endpointBeltC);
+        if (endpoints['C']) {
+            apiConstruct.node.addDependency(endpoints['C']);
         }
 
         new CfnOutput(this, 'InferenceApiUrlOutput', {

@@ -10,24 +10,33 @@ from dataclasses import dataclass, asdict
 @dataclass
 class RequestData:
     s3Key: str
+    beltType: str
     reEval: Optional[bool] = None
 
     def __post_init__(self):
         """
         Validate the fields after the dataclass is initialized.
         """
-        # Validate field types
+        # Validate s3Key
         if not isinstance(self.s3Key, str):
             raise ValueError(f"'s3Key' must be a string, got {type(self.s3Key).__name__}")
-        
+
+        # Validate beltType
+        allowed_belt_types = ('A', 'B', 'C')
+        if not isinstance(self.beltType, str) or self.beltType not in allowed_belt_types:
+            raise ValueError(f"'beltType' must be one of {allowed_belt_types}, got {self.beltType}")
+
+        # Validate reEval
         if self.reEval is not None and not isinstance(self.reEval, bool):
             raise ValueError(f"'reEval' must be a boolean, got {type(self.reEval).__name__}")
 
 
-# Initialize SageMaker runtime client
 sagemaker_runtime = boto3.client('sagemaker-runtime')
-# Retrieve endpoint name from environment variables
-endpoint_name = os.getenv('SAGEMAKER_ENDPOINT_NAME')
+endpoint_mapping = {
+    'A': os.getenv('SAGEMAKER_ENDPOINT_NAME_BELT_A'),
+    'B': os.getenv('SAGEMAKER_ENDPOINT_NAME_BELT_B'),
+    'C': os.getenv('SAGEMAKER_ENDPOINT_NAME_BELT_C')
+}
 dynamodb = boto3.resource('dynamodb', region_name=os.environ['AWS_REGION'])
 table = dynamodb.Table(os.getenv('DYNAMODB_TABLE_NAME'))
 
@@ -140,6 +149,12 @@ def get_inference(
             raise ValueError("POST request missing body.")
 
         data = RequestData(**body)
+        if endpoint_mapping[data.beltType] == "None" or endpoint_mapping[data.beltType] == "NotTrained":
+            return {
+                "statusCode": 400,
+                "body": {"message": f"Model for beltType: {data.beltType} not trained yet."}
+            }
+        
         try:
             # Query the DynamoDB table based on `s3Key`
             response = query_table_with_keys(table, data.s3Key)
@@ -155,7 +170,7 @@ def get_inference(
 
             payload_json = json.dumps(payload)
             sm_response = sagemaker_runtime.invoke_endpoint(
-                EndpointName=endpoint_name,
+                EndpointName=endpoint_mapping[data.beltType],
                 ContentType="application/json",
                 Body=payload_json
             )

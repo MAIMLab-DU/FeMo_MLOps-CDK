@@ -4,8 +4,9 @@ set -e
 
 pipeline_name=""
 profile=""
+config_local_path="configuration/projectConfig.json"
+project_name=$(jq -r ".projectName // empty" $config_local_path)
 
-# Usage function
 function usage {
     echo "Usage: $0 [-c|--pipeline-name <pipeline_name>] [-p|--profile <profile>] [-h|--help]"
     echo
@@ -16,7 +17,6 @@ function usage {
     echo "                         Specify the AWS profile to use (optional)."
     echo "  -h, --help             Show this help message and exit."
     echo
-    exit 0
 }
 
 # Parse command-line arguments
@@ -74,9 +74,10 @@ echo 'Installing dependencies'
 yarn install --check-files
 
 if [[ -z "$pipeline_name" ]]; then
-    model_package_name_beltA=$(cat ${CODEBUILD_SRC_DIR_PipelineOutput}/pipelineExecution_beltA.json | jq ".arn" -r)
-    model_package_name_beltB=$(cat ${CODEBUILD_SRC_DIR_PipelineOutput}/pipelineExecution_beltB.json | jq ".arn" -r)
-    model_package_name_beltC=$(cat ${CODEBUILD_SRC_DIR_PipelineOutput}/pipelineExecution_beltC.json | jq ".arn" -r)
+    # shellcheck disable=SC2154
+    model_package_name_beltA=$(jq ".arn" -r "$CODEBUILD_SRC_DIR_PipelineOutput/pipelineExecution_beltA.json") 
+    model_package_name_beltB=$(jq ".arn" -r "$CODEBUILD_SRC_DIR_PipelineOutput/pipelineExecution_beltB.json") 
+    model_package_name_beltC=$(jq ".arn" -r "$CODEBUILD_SRC_DIR_PipelineOutput/pipelineExecution_beltC.json") 
 else
     action_name="MLPipeline"
     
@@ -129,24 +130,32 @@ else
         echo "Error: Artifact zip file was not downloaded."
         exit 1
     fi
-    unzip -o -q artifact.zip
 
-    # Check for extraction errors
-    if [[ $? -ne 0 ]]; then
+    if ! unzip -o -q artifact.zip; then
         echo "Error: Failed to extract files from artifact.zip."
         exit 1
     fi
     rm artifact.zip
 
-    model_package_name_beltA=$(cat pipelineExecution_beltA.json | jq ".arn" -r)
-    model_package_name_beltB=$(cat pipelineExecution_beltB.json | jq ".arn" -r)
-    model_package_name_beltC=$(cat pipelineExecution_beltC.json | jq ".arn" -r)
+    model_package_name_beltA=$(jq ".arn" -r pipelineExecution_beltA.json)
+    model_package_name_beltB=$(jq ".arn" -r pipelineExecution_beltB.json)
+    model_package_name_beltC=$(jq ".arn" -r pipelineExecution_beltC.json)
+fi
+
+if [[ "$model_package_name_beltA" == "NotTrained" ]]; then
+    model_package_name_beltA=$(aws cloudformation describe-stacks --stack-name "$project_name-DeploymentStack" --query "Stacks[0].Parameters[?ParameterKey=='modelPackageNameBeltA'].ParameterValue" --output text)
+fi
+if [[ "$model_package_name_beltB" == "NotTrained" ]]; then
+    model_package_name_beltB=$(aws cloudformation describe-stacks --stack-name "$project_name-DeploymentStack" --query "Stacks[0].Parameters[?ParameterKey=='modelPackageNameBeltB'].ParameterValue" --output text)
+fi
+if [[ "$model_package_name_beltC" == "NotTrained" ]]; then
+    model_package_name_beltC=$(aws cloudformation describe-stacks --stack-name "$project_name-DeploymentStack" --query "Stacks[0].Parameters[?ParameterKey=='modelPackageNameBeltC'].ParameterValue" --output text)
 fi
 
 echo 'Deploying Model in your AWS account'
 if [[ -n "$profile" ]]; then
-    yarn cdk deploy --require-approval never --parameters modelPackageNameBeltA=${model_package_name_beltA} modelPackageNameBeltB=${model_package_name_beltB} modelPackageNameBeltC=${model_package_name_beltC} --profile "$profile" --app cdk.out/
+    yarn cdk deploy --require-approval never --parameters modelPackageNameBeltA="${model_package_name_beltA}" --parameters modelPackageNameBeltB="${model_package_name_beltB}" --parameters modelPackageNameBeltC="${model_package_name_beltC}" --profile "$profile" --app cdk.out/
 else
-    yarn cdk deploy --require-approval never --parameters modelPackageNameBeltA=${model_package_name_beltA} modelPackageNameBeltB=${model_package_name_beltB} modelPackageNameBeltC=${model_package_name_beltC} --app cdk.out/
+    yarn cdk deploy --require-approval never --parameters modelPackageNameBeltA="${model_package_name_beltA}" --parameters modelPackageNameBeltB="${model_package_name_beltB}" --parameters modelPackageNameBeltC="${model_package_name_beltC}" --app cdk.out/
 fi
 popd

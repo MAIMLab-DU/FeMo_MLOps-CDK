@@ -5,15 +5,15 @@ import json
 
 sagemaker = boto3.client('sagemaker', region_name=os.environ['AWS_REGION'])
 
-def create_model(project_name, model_package_name, dyanmodb_table_name, execution_role_arn):
+def create_model(project_name, model_package_name, belt_type, dyanmodb_table_name, execution_role_arn):
 
-    if model_package_name == "None":
+    if model_package_name == "NotTrained":
         return {
             "PhysicalResourceId": model_package_name
         }
 
     now = datetime.datetime.now(datetime.timezone.utc)
-    model_name = f"{project_name}-{now.year}-{now.month}-{now.day}-{now.hour}-{now.minute}-{now.second}-{now.microsecond}"
+    model_name = f"{project_name}-{belt_type}-{now.year}-{now.month}-{now.day}-{now.hour}-{now.minute}-{now.second}-{now.microsecond}"
     print(f"Creating model {model_name} for modelPackageName: {model_package_name} with role {execution_role_arn}")
 
     model_package = sagemaker.describe_model_package(
@@ -46,6 +46,8 @@ def create_model(project_name, model_package_name, dyanmodb_table_name, executio
     }
 
 def delete_model(model_name):
+    if model_name == "NotTrained":
+        return {}
     print(f"Deleting model: {model_name}")
     sagemaker.delete_model(
         ModelName=model_name
@@ -61,6 +63,7 @@ def dispatch(event, request_type):
         return create_model(
             props["projectName"],
             props["modelPackageName"],
+            props["beltType"],
             props["inferenceResultTable"],
             props["sagemakerExecutionRole"]
         )
