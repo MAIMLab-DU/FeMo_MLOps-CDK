@@ -227,9 +227,7 @@ export class CodePipelineConstruct extends Construct {
                     'sagemaker:DescribePipelineExecution',
                     'sagemaker:ListPipelineExecutionSteps',
                 ],
-                Resource: [
-                    `arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:pipeline/*`,
-                ],
+                Resource: [`arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:pipeline/*`],
             })
         );
 
