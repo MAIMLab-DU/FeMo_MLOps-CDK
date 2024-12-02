@@ -208,6 +208,13 @@ export class CodePipelineConstruct extends Construct {
         );
 
         mlPipelineRole.addToPolicy(
+            new iam.PolicyStatement({
+                actions: ['codepipeline:ListPipelineExecutions', 'codepipeline:StopPipelineExecution'],
+                resources: [`arn:aws:codepipeline:${Stack.of(this).region}:${Stack.of(this).account}:*`],
+            })
+        );
+
+        mlPipelineRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: [
