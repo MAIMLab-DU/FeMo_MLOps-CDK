@@ -21,7 +21,7 @@ phases:
     commands:
       - bash scripts/ci.sh -c "$CONFIG_S3_PATH"
       - bash scripts/docker_build_push.sh -c "$PIPELINE_NAME" -e "$ECR_REPOSITORY_NAME"
-      - bash scripts/copy_data_manifest.sh
+      - bash scripts/prepare_manifest.sh -c "$PIPELINE_NAME"
 
 artifacts:
   files:
@@ -39,6 +39,8 @@ artifacts:
       files:
         - '**/*'
       exclude-paths:
+        - 'data/**/*'
+        - 'work_dir/**/*'
         - '.venv/**/*'
         - '*_cache*/**/*'
         - '*/.venv/**/*'

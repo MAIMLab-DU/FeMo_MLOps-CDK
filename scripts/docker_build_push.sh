@@ -20,7 +20,6 @@ function usage {
     echo "                         Specify the AWS profile to use (optional)."
     echo "  -h, --help             Show this help message and exit."
     echo
-    exit 0
 }
 
 # Parse command-line arguments
@@ -40,6 +39,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -h|--help)
             usage  # Display help and exit
+            exit
             ;;
         *)
             echo "Invalid option: $1" >&2

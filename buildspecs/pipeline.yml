@@ -3,22 +3,21 @@ version: 0.2
 env:
   variables:
     pythonversion: 3.10
-  
-  parameter-store:
-    AWS_ACCESS_KEY_ID: /CodeBuild/AWS_ACCESS_KEY_ID
-    AWS_SECRET_ACCESS_KEY: /CodeBuild/AWS_SECRET_ACCESS_KEY
 
 phases:
   install:
     runtime-versions:
       python: $pythonversion
 
+  pre_build:
+    commands:
+      - export PIPELINE_NAME=`echo $CODEBUILD_INITIATOR | cut -c14-`
+
   build:
     commands:
-      - cd $CODEBUILD_SRC_DIR_BuildOutputML/aws_sagemaker/
-      - bash run_pipeline.sh
+      - bash scripts/ml_pipeline.sh -c "$PIPELINE_NAME"
 
 artifacts:
   base-directory: $CODEBUILD_SRC_DIR_BuildOutputML/aws_sagemaker
   files:
-    - 'pipelineExecution.json'
+    - 'pipelineExecution_belt*.json'

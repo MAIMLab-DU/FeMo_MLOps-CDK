@@ -14,7 +14,6 @@ function usage {
     echo "                         Specify the AWS profile to use (optional)."
     echo "  -h, --help             Show this help message and exit."
     echo
-    exit 0
 }
 
 # Parse command-line arguments
@@ -26,6 +25,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -h|--help)
             usage  # Display help and exit
+            exit 0
             ;;
         *)
             echo "Invalid option: $1" >&2
@@ -37,12 +37,12 @@ done
 
 # Build the Model deployment package
 
-pushd $SCRIPT_DIR/../model_deploy
+pushd "$SCRIPT_DIR"/../model_deploy
 
 python3 -m venv .venv
 source .venv/bin/activate
 pip install ruff==0.6.4
-ruff check ***/**/*.py
+ruff check ./***/**/*.py
 deactivate
 
 yarn install --frozen-lockfile
