@@ -39,7 +39,7 @@ def list_objects_by_belt_type(bucket_name):
                     print(f"Skipping invalid file path: {key}")
                     continue
                 
-                belt_type, device_id, file_name = parts[0], parts[1], parts[2]
+                belt_type, device_id, _ = parts[0], parts[1], parts[2]
                 # Validate belt_type format
                 if not re.match(r"^[ABC]_type$", belt_type):
                     print(f"Skipping invalid belt_type format: {belt_type} in file path: {key}")
@@ -48,7 +48,7 @@ def list_objects_by_belt_type(bucket_name):
                 belt_type: Literal['A', 'B', 'C'] = belt_type.split('_type')[0]
                 grouped_objects[belt_type].append({
                     "deviceId": device_id,
-                    "fileName": file_name,
+                    "bucketName": bucket_name,
                     "datFileKey": key,
                     "csvFileKey": key.replace('.dat', '.csv')
                 })
