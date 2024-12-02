@@ -163,7 +163,7 @@ export class CodePipelineConstruct extends Construct {
             actionName: 'CIBuild',
             project: buildProject,
             input: sourceCDKCodeOutput,
-            extraInputs: [sourceMLCodeOutput, sourceDataBeltAOutput],
+            extraInputs: [sourceMLCodeOutput, sourceDataBeltAOutput, sourceDataBeltBOutput, sourceDataBeltCOutput],
             outputs: [buildOutputCDK, buildOutputML],
             environmentVariables: {
                 CONFIG_S3_PATH: {
