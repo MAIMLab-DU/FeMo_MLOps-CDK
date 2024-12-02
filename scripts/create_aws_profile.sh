@@ -7,7 +7,6 @@ function usage {
     echo "  -i        AWS Access Key ID."
     echo "  -k        AWS Secret Access Key."
     echo "  -r        AWS Region name."
-    exit 1
 }
 
 profile_flag=false

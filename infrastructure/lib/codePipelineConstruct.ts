@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT-0
 import { Duration, Stack } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-// import { GitConfiguration } from 'aws-cdk-lib/aws-codepipeline';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';

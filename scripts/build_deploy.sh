@@ -25,6 +25,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         -h|--help)
             usage  # Display help and exit
+            exit 0
             ;;
         *)
             echo "Invalid option: $1" >&2

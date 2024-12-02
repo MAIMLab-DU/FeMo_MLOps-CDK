@@ -4,7 +4,6 @@ set -e
 # Usage function
 usage() {
     echo "Usage: $0 --codepipeline-name <codepipeline_name>"
-    exit 1
 }
 
 # Parse arguments
@@ -16,6 +15,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             usage
+            exit 0
             ;;
     esac
 done
@@ -23,6 +23,7 @@ done
 # Check if required arguments are provided
 if [[ -z "$codepipeline_name" ]]; then
     usage
+    exit 1
 fi
 
 # Fetch trigger detail
@@ -43,18 +44,21 @@ case "$trigger_detail" in
         ;;
 esac
 
-items_count=$(jq '.items | length' "$manifest_file")
-if [[ "$items_count" -le 0 ]]; then
-    echo "Items array is empty, stopping pipeline execution."
-    execution_id=$(aws codepipeline list-pipeline-executions --pipeline-name "$codepipeline_name" --max-results 1 | jq -r ".pipelineExecutionSummaries[].pipelineExecutionId")
-    aws codepipeline stop-pipeline-execution \
-        --pipeline-name "$codepipeline_name" \
-        --pipeline-execution-id "$execution_id" \
-        --region "$AWS_DEFAULT_REGION" \
-        --reason "Items array is empty in manifest."
+if [[ "$trigger_detail" == "SourceDataBeltA" || "$trigger_detail" == "SourceDataBeltB" || "$trigger_detail" == "SourceDataBeltC" ]]; then
+    items_count=$(jq '.items | length' "$manifest_file")
+    if [[ "$items_count" -le 0 ]]; then
+        echo "Items array is empty, stopping pipeline execution."
+        execution_id=$(aws codepipeline list-pipeline-executions --pipeline-name "$codepipeline_name" --max-results 1 | jq -r ".pipelineExecutionSummaries[].pipelineExecutionId")
+        aws codepipeline stop-pipeline-execution \
+            --pipeline-name "$codepipeline_name" \
+            --pipeline-execution-id "$execution_id" \
+            --region "$AWS_DEFAULT_REGION" \
+            --reason "Items array is empty in manifest."
+        exit 0
+    fi
+    bash aws_sagemaker/run_pipeline.sh --manifest-file "$manifest_file"
     exit 0
 fi
-bash aws_sagemaker/run_pipeline.sh --manifest-file "$manifest_file"
 
 trigger_repository_id=$(echo "$trigger_detail" | jq -r ".repositoryId // empty")
 if [[ -n $trigger_repository_id ]]; then

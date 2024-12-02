@@ -6,7 +6,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Usage function
 usage() {
     echo "Usage: $0 --codepipeline-name <codepipeline_name>"
-    exit 1
 }
 
 # Parse arguments
@@ -18,6 +17,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             usage
+            exit
             ;;
     esac
 done
@@ -25,6 +25,7 @@ done
 # Check if required arguments are provided
 if [[ -z "$codepipeline_name" ]]; then
     usage
+    exit 1
 fi
 
 # Fetch trigger detail
