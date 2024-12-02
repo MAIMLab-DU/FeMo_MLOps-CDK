@@ -230,10 +230,10 @@ export class CodePipelineConstruct extends Construct {
                 Resource: [
                     `arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:pipeline/${
                         props.projectName
-                    }`,
+                    }-*`,
                     `arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:pipeline/${
                         props.projectName
-                    }/*`,
+                    }-*/*`,
                 ],
             })
         );
