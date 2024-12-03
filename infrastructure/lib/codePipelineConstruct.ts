@@ -249,7 +249,7 @@ export class CodePipelineConstruct extends Construct {
 
         const mlPipelineProject = new codebuild.PipelineProject(this, 'MLPipeline', {
             buildSpec: codebuild.BuildSpec.fromSourceFilename('./buildspecs/pipeline.yml'),
-            timeout: Duration.hours(14),
+            timeout: Duration.hours(36),
             role: mlPipelineRole,
             environment: {
                 buildImage: codebuild.LinuxBuildImage.STANDARD_6_0,
