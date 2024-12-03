@@ -371,9 +371,9 @@ export class CodePipelineConstruct extends Construct {
                 ],
                 resources: [
                     `arn:aws:cloudformation:${Stack.of(this).region}:${Stack.of(this).account}:stack/CDKToolkit/*`,
-                    `arn:aws:cloudformation:${Stack.of(this).region}:${Stack.of(this).account}:stack/Deployment-${
+                    `arn:aws:cloudformation:${Stack.of(this).region}:${Stack.of(this).account}:stack/${
                         props.projectName
-                    }/*`,
+                    }-DeploymentStack/*`,
                 ],
             })
         );
