@@ -67,7 +67,10 @@ if [[ -z "$trigger_detail" ]]; then
     exit 1
 fi
 
-trigger_repo_id=$(echo "$trigger_detail" | jq -r ".repositoryId // empty")
+trigger_repo_id=""
+if echo "$trigger_detail" | jq empty 2>/dev/null; then
+    trigger_repo_id=$(echo "$trigger_detail" | jq -r ".repositoryId // empty")
+fi
 
 if [[ -z "$trigger_repo_id" || "$trigger_repo_id" != "$ML_REPOSITORY_ID"  ]]; then
     echo "Pipeline not triggered by $ML_REPOSITORY_ID"
