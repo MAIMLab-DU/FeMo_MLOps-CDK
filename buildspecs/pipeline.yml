@@ -15,8 +15,8 @@ phases:
 
   build:
     commands:
-      - cd $CODEBUILD_SRC_DIR_BuildOutputML/aws_sagemaker/
-      - bash run_pipeline.sh
+      - cd $CODEBUILD_SRC_DIR_BuildOutputML
+      - bash aws_sagemaker/run_pipeline.sh -m configs/dataManifest.json
 
 artifacts:
   base-directory: $CODEBUILD_SRC_DIR_BuildOutputML/aws_sagemaker

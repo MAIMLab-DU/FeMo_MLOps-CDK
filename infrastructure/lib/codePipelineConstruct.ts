@@ -91,7 +91,6 @@ export class CodePipelineConstruct extends Construct {
             stageName: 'Source',
             actions: [sourceCDKCode, sourceMLCode, sourceData],
         });
-        console.log(`props.gitML.pushFilter: ${props.gitML.pushFilter}`);
         this.pipeline.addTrigger({
             providerType: codepipeline.ProviderType.CODE_STAR_SOURCE_CONNECTION,
             gitConfiguration: {
@@ -204,14 +203,7 @@ export class CodePipelineConstruct extends Construct {
                     'sagemaker:DescribePipelineExecution',
                     'sagemaker:ListPipelineExecutionSteps',
                 ],
-                Resource: [
-                    `arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:pipeline/${
-                        props.projectName
-                    }`,
-                    `arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:pipeline/${
-                        props.projectName
-                    }/*`,
-                ],
+                Resource: [`arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:pipeline/*`],
             })
         );
 
@@ -233,7 +225,7 @@ export class CodePipelineConstruct extends Construct {
 
         const mlPipelineProject = new codebuild.PipelineProject(this, 'MLPipeline', {
             buildSpec: codebuild.BuildSpec.fromSourceFilename('./buildspecs/pipeline.yml'),
-            timeout: Duration.hours(14),
+            timeout: Duration.hours(36),
             role: mlPipelineRole,
             environment: {
                 buildImage: codebuild.LinuxBuildImage.STANDARD_6_0,
@@ -311,9 +303,9 @@ export class CodePipelineConstruct extends Construct {
                 },
                 actions: ['lambda:*Function*'],
                 resources: [
-                    `arn:aws:lambda:${Stack.of(this).region}:${Stack.of(this).account}:function:Deployment-${
+                    `arn:aws:lambda:${Stack.of(this).region}:${Stack.of(this).account}:function:${
                         props.projectName
-                    }*`,
+                    }-DeploymentStack-*`,
                 ],
             })
         );
@@ -338,7 +330,7 @@ export class CodePipelineConstruct extends Construct {
                     },
                 },
                 actions: ['iam:*Role', 'iam:*Policy*', 'iam:*RolePolicy'],
-                resources: [`arn:aws:iam::${Stack.of(this).account}:role/Deployment-${props.projectName}-*`],
+                resources: [`arn:aws:iam::${Stack.of(this).account}:role/${props.projectName}-*`],
             })
         );
 
@@ -355,9 +347,9 @@ export class CodePipelineConstruct extends Construct {
                 ],
                 resources: [
                     `arn:aws:cloudformation:${Stack.of(this).region}:${Stack.of(this).account}:stack/CDKToolkit/*`,
-                    `arn:aws:cloudformation:${Stack.of(this).region}:${Stack.of(this).account}:stack/Deployment-${
+                    `arn:aws:cloudformation:${Stack.of(this).region}:${Stack.of(this).account}:stack/${
                         props.projectName
-                    }/*`,
+                    }-DeploymentStack/*`,
                 ],
             })
         );
