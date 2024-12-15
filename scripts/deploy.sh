@@ -141,6 +141,11 @@ else
     echo MODEL_PACKAGE_NAME=${model_package_name}
 fi
 
+if [[ "$model_package_name" == "NotTrained" ]]; then
+    echo "Model not trained yet..."
+    exit 1
+fi
+
 echo 'Deploying Model in your AWS account'
 if [[ -n "$profile" ]]; then
     yarn cdk deploy --require-approval never --parameters modelPackageName=${model_package_name} --profile "$profile" --app cdk.out/
