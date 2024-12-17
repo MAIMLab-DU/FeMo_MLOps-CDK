@@ -12,11 +12,11 @@ import * as codepipeline_actions from 'aws-cdk-lib/aws-codepipeline-actions';
 
 export type CodePipelineConstructPropsBase = {
     readonly projectName: string;
-    readonly sageMakerForceExtractFeatures: boolean;
 } & CodePipelineConstructPropsGithubSource;
 
 export type CodePipelineConstructProps = {
     readonly projectConfigPath: string;
+    readonly dataBucket: s3.IBucket;
     readonly dataManifestBucket: s3.Bucket;
     readonly ecrRepo: ecr.Repository;
     readonly sageMakerArtifactBucket: s3.Bucket;
@@ -51,6 +51,7 @@ export class CodePipelineConstruct extends Construct {
 
         this.pipeline = new codepipeline.Pipeline(this, 'MLOpsPipeline', {
             pipelineType: codepipeline.PipelineType.V2,
+            executionMode: codepipeline.ExecutionMode.QUEUED,
         });
 
         const sourceMLCodeOutput = new codepipeline.Artifact('SourceMLCodeOutput');
@@ -193,6 +194,21 @@ export class CodePipelineConstruct extends Construct {
         mlPipelineRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
+                Action: ['s3:GetObject', 's3:PutObject', 's3:ListBucket'],
+                Resource: [props.dataBucket.bucketArn, `${props.dataBucket.bucketArn}/*`],
+            })
+        );
+
+        mlPipelineRole.addToPolicy(
+            new iam.PolicyStatement({
+                actions: ['codepipeline:ListPipelineExecutions'],
+                resources: [`arn:aws:codepipeline:${Stack.of(this).region}:${Stack.of(this).account}:*`],
+            })
+        );
+
+        mlPipelineRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
                 Action: [
                     'sagemaker:CreatePipeline',
                     'sagemaker:ListTags',
@@ -212,14 +228,6 @@ export class CodePipelineConstruct extends Construct {
                 Effect: 'Allow',
                 Action: ['iam:PassRole'],
                 Resource: [props.sageMakerExecutionRole.roleArn],
-            })
-        );
-
-        mlPipelineRole.addToPolicy(
-            iam.PolicyStatement.fromJson({
-                Effect: 'Allow',
-                Action: ['ssm:GetParameters', 'ssm:GetParameter', 'ssm:GetParameterHistory'],
-                Resource: [`arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/CodeBuild/*`],
             })
         );
 
@@ -247,9 +255,9 @@ export class CodePipelineConstruct extends Construct {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: props.ecrRepo.repositoryUri,
                 },
-                FORCE_EXTRACT_FEATURES: {
+                ML_REPOSITORY_ID: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: props.sageMakerForceExtractFeatures,
+                    value: `${props.gitML.githubRepoOwner}/${props.gitML.githubRepoName}`,
                 },
                 SAGEMAKER_ARTIFACT_BUCKET: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,

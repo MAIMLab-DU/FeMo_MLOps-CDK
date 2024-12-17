@@ -31,11 +31,11 @@ export class InfrastractureStack extends Stack {
         const codePipeline = new CodePipelineConstruct(this, 'CodePipeline', {
             ...props,
             projectConfigPath: projectConfigPath.valueAsString,
+            dataBucket: dataSource.dataBucket,
             dataManifestBucket: dataSource.dataManifestBucket,
             ecrRepo: ecrRepos.ecrRepository,
             sageMakerArtifactBucket: sageMaker.sagemakerArtifactBucket,
             sageMakerExecutionRole: sageMaker.sagemakerExecutionRole,
-            sageMakerForceExtractFeatures: props.sageMakerForceExtractFeatures,
         });
 
         new CfnOutput(this, 'CodePipelineOutput', {
