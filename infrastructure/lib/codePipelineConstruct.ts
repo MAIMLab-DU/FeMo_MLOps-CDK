@@ -12,11 +12,11 @@ import * as codepipeline_actions from 'aws-cdk-lib/aws-codepipeline-actions';
 
 export type CodePipelineConstructPropsBase = {
     readonly projectName: string;
-    readonly sageMakerForceExtractFeatures: boolean;
 } & CodePipelineConstructPropsGithubSource;
 
 export type CodePipelineConstructProps = {
     readonly projectConfigPath: string;
+    readonly dataBucket: s3.IBucket;
     readonly dataManifestBucket: s3.Bucket;
     readonly ecrRepo: ecr.Repository;
     readonly sageMakerArtifactBucket: s3.Bucket;
@@ -91,7 +91,6 @@ export class CodePipelineConstruct extends Construct {
             stageName: 'Source',
             actions: [sourceCDKCode, sourceMLCode, sourceData],
         });
-        console.log(`props.gitML.pushFilter: ${props.gitML.pushFilter}`);
         this.pipeline.addTrigger({
             providerType: codepipeline.ProviderType.CODE_STAR_SOURCE_CONNECTION,
             gitConfiguration: {
@@ -194,6 +193,21 @@ export class CodePipelineConstruct extends Construct {
         mlPipelineRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
+                Action: ['s3:GetObject', 's3:PutObject', 's3:ListBucket'],
+                Resource: [props.dataBucket.bucketArn, `${props.dataBucket.bucketArn}/*`],
+            })
+        );
+
+        mlPipelineRole.addToPolicy(
+            new iam.PolicyStatement({
+                actions: ['codepipeline:ListPipelineExecutions'],
+                resources: [`arn:aws:codepipeline:${Stack.of(this).region}:${Stack.of(this).account}:*`],
+            })
+        );
+
+        mlPipelineRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
                 Action: [
                     'sagemaker:CreatePipeline',
                     'sagemaker:ListTags',
@@ -204,14 +218,7 @@ export class CodePipelineConstruct extends Construct {
                     'sagemaker:DescribePipelineExecution',
                     'sagemaker:ListPipelineExecutionSteps',
                 ],
-                Resource: [
-                    `arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:pipeline/${
-                        props.projectName
-                    }`,
-                    `arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:pipeline/${
-                        props.projectName
-                    }/*`,
-                ],
+                Resource: [`arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:pipeline/*`],
             })
         );
 
@@ -223,17 +230,9 @@ export class CodePipelineConstruct extends Construct {
             })
         );
 
-        mlPipelineRole.addToPolicy(
-            iam.PolicyStatement.fromJson({
-                Effect: 'Allow',
-                Action: ['ssm:GetParameters', 'ssm:GetParameter', 'ssm:GetParameterHistory'],
-                Resource: [`arn:aws:ssm:${Stack.of(this).region}:${Stack.of(this).account}:parameter/CodeBuild/*`],
-            })
-        );
-
         const mlPipelineProject = new codebuild.PipelineProject(this, 'MLPipeline', {
             buildSpec: codebuild.BuildSpec.fromSourceFilename('./buildspecs/pipeline.yml'),
-            timeout: Duration.hours(14),
+            timeout: Duration.hours(36),
             role: mlPipelineRole,
             environment: {
                 buildImage: codebuild.LinuxBuildImage.STANDARD_6_0,
@@ -255,9 +254,9 @@ export class CodePipelineConstruct extends Construct {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: props.ecrRepo.repositoryUri,
                 },
-                FORCE_EXTRACT_FEATURES: {
+                ML_REPOSITORY_ID: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-                    value: props.sageMakerForceExtractFeatures,
+                    value: `${props.gitML.githubRepoOwner}/${props.gitML.githubRepoName}`,
                 },
                 SAGEMAKER_ARTIFACT_BUCKET: {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
@@ -311,9 +310,9 @@ export class CodePipelineConstruct extends Construct {
                 },
                 actions: ['lambda:*Function*'],
                 resources: [
-                    `arn:aws:lambda:${Stack.of(this).region}:${Stack.of(this).account}:function:Deployment-${
+                    `arn:aws:lambda:${Stack.of(this).region}:${Stack.of(this).account}:function:${
                         props.projectName
-                    }*`,
+                    }-DeploymentStack-*`,
                 ],
             })
         );
@@ -338,7 +337,7 @@ export class CodePipelineConstruct extends Construct {
                     },
                 },
                 actions: ['iam:*Role', 'iam:*Policy*', 'iam:*RolePolicy'],
-                resources: [`arn:aws:iam::${Stack.of(this).account}:role/Deployment-${props.projectName}-*`],
+                resources: [`arn:aws:iam::${Stack.of(this).account}:role/${props.projectName}-*`],
             })
         );
 
@@ -355,9 +354,9 @@ export class CodePipelineConstruct extends Construct {
                 ],
                 resources: [
                     `arn:aws:cloudformation:${Stack.of(this).region}:${Stack.of(this).account}:stack/CDKToolkit/*`,
-                    `arn:aws:cloudformation:${Stack.of(this).region}:${Stack.of(this).account}:stack/Deployment-${
+                    `arn:aws:cloudformation:${Stack.of(this).region}:${Stack.of(this).account}:stack/${
                         props.projectName
-                    }/*`,
+                    }-DeploymentStack/*`,
                 ],
             })
         );

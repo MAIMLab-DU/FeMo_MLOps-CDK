@@ -47,6 +47,7 @@ export class ModelDeploymentStack extends Stack {
 
         const modelPackageName = new CfnParameter(this, 'modelPackageName', {
             type: 'String',
+            default: 'NotTrained',
         });
 
         const executionRole = new iam.Role(this, 'SageMakerModelExecutionRole', {
@@ -79,10 +80,7 @@ export class ModelDeploymentStack extends Stack {
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: ['sagemaker:CreateModel', 'sagemaker:DeleteModel', 'sagemaker:DescribeModelPackage'],
-                Resource: [
-                    `arn:aws:sagemaker:${this.region}:${this.account}:model/${props.projectName}*`,
-                    modelPackageName.valueAsString,
-                ],
+                Resource: ['*'],
             })
         );
 
@@ -100,7 +98,7 @@ export class ModelDeploymentStack extends Stack {
             code: lambda.Code.fromAsset(path.join(__dirname, '../customResources/inferenceModel'), {
                 exclude: ['.venv', '.ruff_cache', '.pytest_cache', '*.pyc', '__pycache__'],
             }),
-            timeout: Duration.minutes(2),
+            timeout: Duration.minutes(10),
             role: inferenceModelFunctionRole,
         });
 
