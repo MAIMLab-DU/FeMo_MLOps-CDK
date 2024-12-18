@@ -84,7 +84,6 @@ export class CodePipelineConstruct extends Construct {
             output: sourceDataOutput,
             bucket: props.dataManifestBucket,
             bucketKey: 'manifest.json.zip',
-            trigger: codepipeline_actions.S3Trigger.EVENTS,
         });
 
         this.pipeline.addStage({
