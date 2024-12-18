@@ -17,13 +17,13 @@ phases:
       - trigger_repo_id=""
       - |
         if echo "$trigger_detail" | jq empty 2>/dev/null; then
-            trigger_repo_id=$(echo "$trigger_detail" | jq -r ".repositoryId // empty")
+          trigger_repo_id=$(echo "$trigger_detail" | jq -r ".repositoryId // empty")
         fi
       - |
         if [[ "$trigger_repo_id" == "$ML_REPOSITORY_ID" ]]; then
-            export FORCE_EXTRACT_FEATURES=true
+          export FORCE_EXTRACT_FEATURES=true
         else
-            export FORCE_EXTRACT_FEATURES=false
+          export FORCE_EXTRACT_FEATURES=false
         fi
 
   build:
