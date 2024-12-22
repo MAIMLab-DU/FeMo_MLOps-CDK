@@ -145,6 +145,7 @@ export class ModelDeploymentStack extends Stack {
 
         const apiConstruct = new InferenceApiConstruct(this, 'InferenceAPIConstruct', {
             ipCIDRBlocks: props.ipPermitList,
+            modelPackageName: modelPackageName.valueAsString,
             sageMakeEndpointArn: endpoint.ref,
             sageMakerEndpointName: endpoint.getAtt('EndpointName').toString(),
             inferenceResultTable: inferenceResultTable,
