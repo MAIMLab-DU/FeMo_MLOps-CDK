@@ -12,6 +12,7 @@ import * as path from 'path';
 
 export interface InferencApiConstructProps {
     readonly ipCIDRBlocks: string[];
+    readonly modelPackageName: string;
     readonly sageMakeEndpointArn: string;
     readonly sageMakerEndpointName: string;
     readonly inferenceResultTable: dynamodb.Table;
@@ -34,9 +35,6 @@ export class InferenceApiConstruct extends Construct {
                 s3Key: {
                     type: apigateway.JsonSchemaType.STRING,
                     pattern: '^s3://.*\\.dat$', // Regex for s3Key validation
-                },
-                reEval: {
-                    type: apigateway.JsonSchemaType.BOOLEAN,
                 },
             },
             required: ['s3Key'], // Specify required properties
@@ -109,6 +107,7 @@ export class InferenceApiConstruct extends Construct {
             timeout: Duration.minutes(1),
             role: inferenceApiFunctionRole,
             environment: {
+                MODEL_PACKAGE_NAME: props.modelPackageName,
                 SAGEMAKER_ENDPOINT_NAME: props.sageMakerEndpointName,
                 DYNAMODB_TABLE_NAME: props.inferenceResultTable.tableName,
             },
