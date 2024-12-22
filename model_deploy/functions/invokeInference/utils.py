@@ -10,7 +10,6 @@ from dataclasses import dataclass, asdict
 @dataclass
 class RequestData:
     s3Key: str
-    reEval: Optional[bool] = None
 
     def __post_init__(self):
         """
@@ -19,9 +18,6 @@ class RequestData:
         # Validate field types
         if not isinstance(self.s3Key, str):
             raise ValueError(f"'s3Key' must be a string, got {type(self.s3Key).__name__}")
-        
-        if self.reEval is not None and not isinstance(self.reEval, bool):
-            raise ValueError(f"'reEval' must be a boolean, got {type(self.reEval).__name__}")
 
 
 # Initialize SageMaker runtime client
