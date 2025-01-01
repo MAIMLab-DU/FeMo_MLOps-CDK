@@ -8,22 +8,6 @@ phases:
   install:
     runtime-versions:
       python: $pythonversion
-  
-  pre_build:
-    commands:
-      - echo "Checking pipeline trigger..."
-      - pipeline_name=$(echo $CODEBUILD_INITIATOR | cut -c14-)
-      - trigger_detail=$(aws codepipeline list-pipeline-executions --pipeline-name "$pipeline_name" --max-results 1 | jq -r ".pipelineExecutionSummaries[].trigger.triggerDetail // empty")
-      - trigger_repo_id=""
-      - |
-        if echo "$trigger_detail" | jq empty 2>/dev/null; then
-          trigger_repo_id=$(echo "$trigger_detail" | jq -r ".repositoryId // empty")
-        fi
-      - echo "trigger_repo_id=$trigger_repo_id"
-      - |
-        if [[ "$trigger_repo_id" == "$ML_REPOSITORY_ID" ]]; then
-          export FORCE_EXTRACT_FEATURES=true
-        fi
 
   build:
     commands:
