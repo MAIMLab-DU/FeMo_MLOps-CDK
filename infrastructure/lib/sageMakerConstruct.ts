@@ -36,7 +36,7 @@ export class SageMakerConstruct extends Construct {
         this.sagemakerExecutionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
-                Action: ['s3:GetObject', 's3:ListBucket'],
+                Action: ['s3:GetObject', 's3:PutObject', 's3:ListBucket'],
                 Resource: [props.dataBucket.bucketArn, `${props.dataBucket.bucketArn}/*`],
             })
         );
