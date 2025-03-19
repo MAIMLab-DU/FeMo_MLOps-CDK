@@ -1,6 +1,7 @@
 import boto3
 import json
 import os
+import traceback
 from decimal import Decimal
 from datetime import datetime
 from boto3.dynamodb.conditions import Key
@@ -139,14 +140,39 @@ def process_response(item, status_code=None):
     }
     body = convert_decimals(body)
 
-    if status_code == 200:
-        result = body['result']
-        body['result'] = {
-            "numBoutsPerHour": (result['numKicks'] * 60) / (result['totalFMDuration'] + result['totalNonFMDuration']) if result['numKicks'] > 0 else 0,
-            "meanDurationFM_s": result['totalFMDuration'] * 60 / result['numKicks'] if result['numKicks'] > 0 else 0,
-            "medianOnsetInterval_s": result['medianOnsetInterval_s'],
-            "activeTimeFM_%": (result['totalFMDuration'] / (result['totalFMDuration'] + result['totalNonFMDuration'])) * 100 if result['numKicks'] > 0 else 0,
+    def process_result(data: dict) -> dict:
+        """Compute hiccup metrics for given data dictionary."""
+        if data.get('numKicks', 0) == 0:
+            return {
+                "numBoutsPerHour": 0,
+                "meanDurationFM_s": 0,
+                "medianOnsetInterval_s": data.get("medianOnsetInterval_s", 0),
+                "activeTimeFM_%": 0,
+            }
+        
+        total_duration = data["totalFMDuration"] + data["totalNonFMDuration"]
+        
+        return {
+            "numBoutsPerHour": (data["numKicks"] * 60) / total_duration,
+            "meanDurationFM_s": (data["totalFMDuration"] * 60) / data["numKicks"],
+            "medianOnsetInterval_s": data["medianOnsetInterval_s"],
+            "activeTimeFM_%": (data["totalFMDuration"] / total_duration) * 100,
         }
+
+    if status_code == 200:
+        result = body["result"]
+    
+        # Process pre_hiccup and post_hiccup if available
+        if result.get("pre_hiccup", None) is not None:
+            result["pre_hiccup"] = process_result(result.get("pre_hiccup"))
+        if result.get("post_hiccup", None) is not None:
+            result["post_hiccup"] = process_result(result.get("post_hiccup"))
+
+        # If neither exist, process the main result
+        if result.get("pre_hiccup", None) is None and result.get("post_hiccup", None) is None:
+            result = process_result(result)
+
+        body["result"] = result
     
     return {
         "statusCode": status_code,
@@ -180,15 +206,14 @@ def get_inference(
         try:
             # Query the DynamoDB table based on `s3Key`
             response = query_table_with_keys(table, data.s3Key)
+
+            # Check if cached results exist
             if 'Items' in response and response['Items']:
                 item = response['Items'][0]
-                try:
-                    existing_version = item.get('modelVersion')
-                    if existing_version == model_version:
-                        # Re-use cached result if model version matches
-                        return process_response(item)
-                except KeyError:
-                    pass
+                existing_version = item.get('modelVersion', None)
+                if existing_version == model_version:
+                    # Re-use cached result if model version matches
+                    return process_response(item)
 
             # If no cached results, invoke SageMaker endpoint
             payload = asdict(data)
@@ -210,6 +235,7 @@ def get_inference(
             }
 
         except Exception as e:
+            print(f"Error invoking SageMaker endpoint: {e}\t{traceback.format_exc()}")
             return {
                 "statusCode": 500,
                 "body": {"message": str(e)}
@@ -235,6 +261,7 @@ def get_inference(
             }
 
         except Exception as e:
+            print(f"Error invoking SageMaker endpoint: {e}\t{traceback.format_exc()}")
             return {
                 "statusCode": 500,
                 "body": {"message": str(e)}

@@ -51,18 +51,25 @@ jobs:
       # CI check
       - name: Build Deployment Stack
         run: |
-          if [[ "${{ github.ref_name }}" == "dev" ]]; then
+          # Determine the target branch (push or pull request)
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            TARGET_BRANCH="${{ github.base_ref }}"
+          else
+            TARGET_BRANCH="${{ github.ref_name }}"
+          fi
+
+          if [[ "$TARGET_BRANCH" == "dev" ]]; then
             bash scripts/create_aws_profile.sh -p "${{ secrets.DEV_AWS_PROFILE }}" -i "${{ secrets.DEV_ACCESS_KEY_ID }}" -k "${{ secrets.DEV_SECRET_ACCESS_KEY }}" -r "${{ secrets.DEV_REGION }}"
             echo "${{ secrets.DEV_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
             bash scripts/build_deploy.sh -p "${{ secrets.DEV_AWS_PROFILE }}"
 
-          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+          elif [[ "$TARGET_BRANCH" == "main" ]]; then
             bash scripts/create_aws_profile.sh -p "${{ secrets.PROD_AWS_PROFILE }}" -i "${{ secrets.PROD_ACCESS_KEY_ID }}" -k "${{ secrets.PROD_SECRET_ACCESS_KEY }}" -r "${{ secrets.PROD_REGION }}"
             echo "${{ secrets.PROD_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
             bash scripts/build_deploy.sh -p "${{ secrets.PROD_AWS_PROFILE }}"
 
           else
-            echo "Unsupported branch: ${{ github.ref_name }}"
+            echo "Unsupported branch: $TARGET_BRANCH"
             exit 1
           fi
 
