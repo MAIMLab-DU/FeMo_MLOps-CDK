@@ -12,7 +12,7 @@ import * as path from 'path';
 
 export interface InferencApiConstructProps {
     readonly ipCIDRBlocks: string[];
-    readonly apiStage: string;
+    readonly modelPackageName: string;
     readonly sageMakeEndpointArn: string;
     readonly sageMakerEndpointName: string;
     readonly inferenceResultTable: dynamodb.Table;
@@ -35,9 +35,6 @@ export class InferenceApiConstruct extends Construct {
                 s3Key: {
                     type: apigateway.JsonSchemaType.STRING,
                     pattern: '^s3://.*\\.dat$', // Regex for s3Key validation
-                },
-                reEval: {
-                    type: apigateway.JsonSchemaType.BOOLEAN,
                 },
             },
             required: ['s3Key'], // Specify required properties
@@ -72,11 +69,6 @@ export class InferenceApiConstruct extends Construct {
                 allowMethods: apigateway.Cors.ALL_METHODS,
             },
             policy: apigatewayPolicy,
-            deployOptions: {
-                stageName: props.apiStage,
-                loggingLevel: apigateway.MethodLoggingLevel.INFO,
-                cachingEnabled: true,
-            },
         });
 
         const model = this.api.addModel('InferenceRequestModel', {
@@ -115,6 +107,7 @@ export class InferenceApiConstruct extends Construct {
             timeout: Duration.minutes(1),
             role: inferenceApiFunctionRole,
             environment: {
+                MODEL_PACKAGE_NAME: props.modelPackageName,
                 SAGEMAKER_ENDPOINT_NAME: props.sageMakerEndpointName,
                 DYNAMODB_TABLE_NAME: props.inferenceResultTable.tableName,
             },
@@ -211,7 +204,6 @@ export class InferenceApiConstruct extends Construct {
             this.api.addDomainName('InferenceApiCustomDomain', {
                 domainName: props.customDomainName,
                 certificate: certificate,
-                basePath: props.apiStage === 'dev' ? 'dev' : '',
             });
 
             // Lookup an existing Route 53 Hosted Zone for the custom domain

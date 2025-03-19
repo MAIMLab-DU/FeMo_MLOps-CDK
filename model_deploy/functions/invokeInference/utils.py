@@ -1,6 +1,7 @@
 import boto3
 import json
 import os
+import traceback
 from decimal import Decimal
 from datetime import datetime
 from boto3.dynamodb.conditions import Key
@@ -10,7 +11,6 @@ from dataclasses import dataclass, asdict
 @dataclass
 class RequestData:
     s3Key: str
-    reEval: Optional[bool] = None
 
     def __post_init__(self):
         """
@@ -19,14 +19,13 @@ class RequestData:
         # Validate field types
         if not isinstance(self.s3Key, str):
             raise ValueError(f"'s3Key' must be a string, got {type(self.s3Key).__name__}")
-        
-        if self.reEval is not None and not isinstance(self.reEval, bool):
-            raise ValueError(f"'reEval' must be a boolean, got {type(self.reEval).__name__}")
 
 
 # Initialize SageMaker runtime client
 sagemaker_runtime = boto3.client('sagemaker-runtime')
 # Retrieve endpoint name from environment variables
+model_package_group = os.getenv('MODEL_PACKAGE_NAME').split('/')[-2]
+model_version = f"Version {os.getenv('MODEL_PACKAGE_NAME').split('/')[-1]}"
 endpoint_name = os.getenv('SAGEMAKER_ENDPOINT_NAME')
 dynamodb = boto3.resource('dynamodb', region_name=os.environ['AWS_REGION'])
 table = dynamodb.Table(os.getenv('DYNAMODB_TABLE_NAME'))
@@ -41,7 +40,44 @@ def convert_decimals(obj):
         return float(obj)  # Or int(obj) if appropriate
     else:
         return obj
-    
+
+
+def update_item_in_dynamodb(table, s3_key, time_stamp, update_data):
+    """
+    Update an item in a DynamoDB table with specific s3Key and timeStamp.
+
+    Args:
+        table_name (str): The name of the DynamoDB table.
+        s3_key (str): The s3Key value to identify the item.
+        time_stamp (str): The timeStamp value to identify the item.
+        update_data (dict): The attributes and their new values to update.
+
+    Returns:
+        dict: Response from the update_item operation.
+    """
+
+    # Build the update expression
+    update_expression = "SET " + ", ".join(f"#{k} = :{k}" for k in update_data.keys())
+    expression_attribute_names = {f"#{k}": k for k in update_data.keys()}
+    expression_attribute_values = {f":{k}": v for k, v in update_data.items()}
+
+    try:
+        # Update the item
+        response = table.update_item(
+            Key={
+                "s3Key": s3_key,
+                "timeStamp": time_stamp
+            },
+            UpdateExpression=update_expression,
+            ExpressionAttributeNames=expression_attribute_names,
+            ExpressionAttributeValues=expression_attribute_values,
+            ReturnValues="UPDATED_NEW"
+        )
+        return response
+    except Exception as e:
+        print(f"Error updating item: {e}")
+        raise
+
 
 def query_table_with_keys(table, s3_key=None, job_id=None, limit=1):
     """
@@ -92,9 +128,11 @@ def process_response(item, status_code=None):
         "Completed": ("Inference job completed.", 200)
     }
     message, status_code = message_map.get(status, ("Inference job failed.", 400)) if not status_code else (message_map.get(status)[0], status_code)
-
+    
     body = {
         "message": message,
+        "modelPackageGroup": item.get('modelPackageGroup'),
+        "modelVersion": item.get('modelVersion'),
         "s3Key": item.get('s3Key'),
         "timeStamp": item.get('timeStamp'),
         "jobId": item.get('jobId'),
@@ -102,14 +140,39 @@ def process_response(item, status_code=None):
     }
     body = convert_decimals(body)
 
-    if status_code == 200:
-        result = body['result']
-        body['result'] = {
-            "numBoutsPerHour": (result['numKicks'] * 60) / (result['totalFMDuration'] + result['totalNonFMDuration']) if result['numKicks'] > 0 else 0,
-            "meanDurationFM_s": result['totalFMDuration'] * 60 / result['numKicks'] if result['numKicks'] > 0 else 0,
-            "medianOnsetInterval_s": result['medianOnsetInterval_s'],
-            "activeTimeFM_%": (result['totalFMDuration'] / (result['totalFMDuration'] + result['totalNonFMDuration'])) * 100 if result['numKicks'] > 0 else 0,
+    def process_result(data: dict) -> dict:
+        """Compute hiccup metrics for given data dictionary."""
+        if data.get('numKicks', 0) == 0:
+            return {
+                "numBoutsPerHour": 0,
+                "meanDurationFM_s": 0,
+                "medianOnsetInterval_s": data.get("medianOnsetInterval_s", 0),
+                "activeTimeFM_%": 0,
+            }
+        
+        total_duration = data["totalFMDuration"] + data["totalNonFMDuration"]
+        
+        return {
+            "numBoutsPerHour": (data["numKicks"] * 60) / total_duration,
+            "meanDurationFM_s": (data["totalFMDuration"] * 60) / data["numKicks"],
+            "medianOnsetInterval_s": data["medianOnsetInterval_s"],
+            "activeTimeFM_%": (data["totalFMDuration"] / total_duration) * 100,
         }
+
+    if status_code == 200:
+        result = body["result"]
+    
+        # Process pre_hiccup and post_hiccup if available
+        if result.get("pre_hiccup", None) is not None:
+            result["pre_hiccup"] = process_result(result.get("pre_hiccup"))
+        if result.get("post_hiccup", None) is not None:
+            result["post_hiccup"] = process_result(result.get("post_hiccup"))
+
+        # If neither exist, process the main result
+        if result.get("pre_hiccup", None) is None and result.get("post_hiccup", None) is None:
+            result = process_result(result)
+
+        body["result"] = result
     
     return {
         "statusCode": status_code,
@@ -143,9 +206,13 @@ def get_inference(
         try:
             # Query the DynamoDB table based on `s3Key`
             response = query_table_with_keys(table, data.s3Key)
+
+            # Check if cached results exist
             if 'Items' in response and response['Items']:
                 item = response['Items'][0]
-                if not data.reEval:
+                existing_version = item.get('modelVersion', None)
+                if existing_version == model_version:
+                    # Re-use cached result if model version matches
                     return process_response(item)
 
             # If no cached results, invoke SageMaker endpoint
@@ -159,6 +226,8 @@ def get_inference(
                 ContentType="application/json",
                 Body=payload_json
             )
+            update_item_in_dynamodb(table, data.s3Key, payload['timeStamp'],
+                                    {"modelVersion": model_version, "modelPackageGroup": model_package_group})
             result = json.loads(sm_response['Body'].read().decode('utf-8'))
             return {
                 "statusCode": 200,
@@ -166,6 +235,7 @@ def get_inference(
             }
 
         except Exception as e:
+            print(f"Error invoking SageMaker endpoint: {e}\t{traceback.format_exc()}")
             return {
                 "statusCode": 500,
                 "body": {"message": str(e)}
@@ -191,6 +261,7 @@ def get_inference(
             }
 
         except Exception as e:
+            print(f"Error invoking SageMaker endpoint: {e}\t{traceback.format_exc()}")
             return {
                 "statusCode": 500,
                 "body": {"message": str(e)}

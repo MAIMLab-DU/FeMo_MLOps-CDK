@@ -18,7 +18,6 @@ export interface ModelDeploymentStackProps extends StackProps {
     projectName: string;
     customDomainName?: string;
     acmCertificateArn?: string;
-    apiStage?: 'dev' | 'prod';
 }
 
 export class ModelDeploymentStack extends Stack {
@@ -48,6 +47,7 @@ export class ModelDeploymentStack extends Stack {
 
         const modelPackageName = new CfnParameter(this, 'modelPackageName', {
             type: 'String',
+            default: 'NotTrained',
         });
 
         const executionRole = new iam.Role(this, 'SageMakerModelExecutionRole', {
@@ -80,10 +80,7 @@ export class ModelDeploymentStack extends Stack {
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
                 Action: ['sagemaker:CreateModel', 'sagemaker:DeleteModel', 'sagemaker:DescribeModelPackage'],
-                Resource: [
-                    `arn:aws:sagemaker:${this.region}:${this.account}:model/${props.projectName}*`,
-                    modelPackageName.valueAsString,
-                ],
+                Resource: ['*'],
             })
         );
 
@@ -101,7 +98,7 @@ export class ModelDeploymentStack extends Stack {
             code: lambda.Code.fromAsset(path.join(__dirname, '../customResources/inferenceModel'), {
                 exclude: ['.venv', '.ruff_cache', '.pytest_cache', '*.pyc', '__pycache__'],
             }),
-            timeout: Duration.minutes(2),
+            timeout: Duration.minutes(10),
             role: inferenceModelFunctionRole,
         });
 
@@ -148,12 +145,12 @@ export class ModelDeploymentStack extends Stack {
 
         const apiConstruct = new InferenceApiConstruct(this, 'InferenceAPIConstruct', {
             ipCIDRBlocks: props.ipPermitList,
+            modelPackageName: modelPackageName.valueAsString,
             sageMakeEndpointArn: endpoint.ref,
             sageMakerEndpointName: endpoint.getAtt('EndpointName').toString(),
             inferenceResultTable: inferenceResultTable,
             customDomainName: props.customDomainName,
             acmCertificateArn: props.acmCertificateArn,
-            apiStage: props.apiStage ?? 'dev',
         });
 
         apiConstruct.node.addDependency(endpoint);

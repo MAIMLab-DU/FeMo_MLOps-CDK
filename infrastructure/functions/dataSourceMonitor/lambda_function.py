@@ -55,7 +55,7 @@ def build_manifest_file_content(previous_manifest=None):
                 "items": all_objects
             }
     else:
-        difference = len(all_objects) - previous_manifest['lastNumObjects']
+        difference = abs(len(all_objects) - previous_manifest['lastNumObjects'])
         if difference >= MIN_DIFF:
             current_manifest = {
                 "version": version,

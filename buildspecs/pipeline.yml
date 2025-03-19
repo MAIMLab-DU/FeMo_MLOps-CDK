@@ -3,10 +3,6 @@ version: 0.2
 env:
   variables:
     pythonversion: 3.10
-  
-  parameter-store:
-    AWS_ACCESS_KEY_ID: /CodeBuild/AWS_ACCESS_KEY_ID
-    AWS_SECRET_ACCESS_KEY: /CodeBuild/AWS_SECRET_ACCESS_KEY
 
 phases:
   install:
@@ -15,8 +11,24 @@ phases:
 
   build:
     commands:
-      - cd $CODEBUILD_SRC_DIR_BuildOutputML/aws_sagemaker/
-      - bash run_pipeline.sh
+      - cd $CODEBUILD_SRC_DIR_BuildOutputML
+      - echo "Checking pipeline trigger..."
+      - pipeline_name=$(echo $CODEBUILD_INITIATOR | cut -c14-)
+      - trigger_detail=$(aws codepipeline list-pipeline-executions --pipeline-name "$pipeline_name" --max-results 1 | jq -r ".pipelineExecutionSummaries[].trigger.triggerDetail // empty")
+      - trigger_repo_id=""
+      - |
+        if echo "$trigger_detail" | jq empty 2>/dev/null; then
+          trigger_repo_id=$(echo "$trigger_detail" | jq -r ".repositoryId // empty")
+        fi
+      - echo "trigger_repo_id=$trigger_repo_id"
+      - |
+        if [[ "$trigger_repo_id" == "$ML_REPOSITORY_ID" ]]; then
+          echo "Triggered by ML repository"
+          bash aws_sagemaker/run_pipeline.sh -m configs/dataManifest.json -f
+        else
+          echo "Not triggered by ML repository"
+          bash aws_sagemaker/run_pipeline.sh -m configs/dataManifest.json
+        fi
 
 artifacts:
   base-directory: $CODEBUILD_SRC_DIR_BuildOutputML/aws_sagemaker
