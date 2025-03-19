@@ -140,3 +140,5 @@ configuration/*.json
 .ruff_cache/
 *.secrets
 work_dir/
+practice/
+practice*
