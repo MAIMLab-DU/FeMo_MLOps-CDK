@@ -79,15 +79,17 @@ if [[ -z "$pipeline_name" ]]; then
 else
     action_name="MLPipeline"
     
-    # Get the latest execution ID of the pipeline
+    # Get the latest execution ID of the pipeline with 'Succeeded' status
     if [[ -n "$profile" ]]; then
         execution_id=$(aws codepipeline list-pipeline-executions --profile "$profile" \
             --pipeline-name "$pipeline_name" \
-            --max-results 1 | jq -r ".pipelineExecutionSummaries[].pipelineExecutionId // empty")
+            --query "pipelineExecutionSummaries[?status=='Succeeded'] | [0].pipelineExecutionId" \
+            --output text)
     else
         execution_id=$(aws codepipeline list-pipeline-executions \
             --pipeline-name "$pipeline_name" \
-            --max-results 1 | jq -r ".pipelineExecutionSummaries[].pipelineExecutionId // empty")
+            --query "pipelineExecutionSummaries[?status=='Succeeded'] | [0].pipelineExecutionId" \
+            --output text)
     fi
 
     if [[ -z "$execution_id" ]]; then
