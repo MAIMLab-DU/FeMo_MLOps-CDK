@@ -20,21 +20,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the repository
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Set up Node.js and Yarn
       - name: Set up Node.js and Yarn
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      # Install Yarn if not globally available
       - name: Install Yarn
         run: npm install -g yarn
 
-      # Install AWS CLI v2
       - name: Install AWS CLI v2
         run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -42,42 +38,42 @@ jobs:
           sudo ./aws/install --update
           aws --version
 
-      # Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-        
-      # CI check
+
       - name: CI check
         run: |
-          # Determine the target branch (push or pull request)
+          set -e
+
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             TARGET_BRANCH="${{ github.base_ref }}"
           else
             TARGET_BRANCH="${{ github.ref_name }}"
           fi
 
+          mkdir -p configuration
+
           if [[ "$TARGET_BRANCH" == "dev" ]]; then
             bash scripts/create_aws_profile.sh -p "${{ secrets.DEV_AWS_PROFILE }}" -i "${{ secrets.DEV_ACCESS_KEY_ID }}" -k "${{ secrets.DEV_SECRET_ACCESS_KEY }}" -r "${{ secrets.DEV_REGION }}"
-            echo "${{ secrets.DEV_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
             bash scripts/ci.sh -c "${{ secrets.DEV_CONFIG_PATH }}" -p "${{ secrets.DEV_AWS_PROFILE }}" --upload
 
           elif [[ "$TARGET_BRANCH" == "main" ]]; then
             bash scripts/create_aws_profile.sh -p "${{ secrets.PROD_AWS_PROFILE }}" -i "${{ secrets.PROD_ACCESS_KEY_ID }}" -k "${{ secrets.PROD_SECRET_ACCESS_KEY }}" -r "${{ secrets.PROD_REGION }}"
-            echo "${{ secrets.PROD_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
             bash scripts/ci.sh -c "${{ secrets.PROD_CONFIG_PATH }}" -p "${{ secrets.PROD_AWS_PROFILE }}" --upload
 
           else
-            echo "Unsupported branch: ${{ github.ref_name }}"
+            echo "Unsupported branch: $TARGET_BRANCH"
             exit 1
           fi
 
-      # Create AWS Profile
       - name: Deploy CDK Stack to AWS
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
+          set -e
           pushd ./infrastructure
+
           if [[ "${{ github.ref_name }}" == "dev" ]]; then
             yarn cdk deploy --require-approval never --parameters projectConfigPath="${{ secrets.DEV_CONFIG_PATH }}" --profile "${{ secrets.DEV_AWS_PROFILE }}" --app cdk.out/
 
