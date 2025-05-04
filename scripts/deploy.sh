@@ -6,152 +6,145 @@ pipeline_name=""
 profile=""
 
 # Usage function
-function usage {
+usage() {
     echo "Usage: $0 [-c|--pipeline-name <pipeline_name>] [-p|--profile <profile>] [-h|--help]"
     echo
     echo "Options:"
-    echo "  -c <pipeline_name>, --pipeline-name <pipeline_name>"
-    echo "                         Specify codepipeline name (optional)."
-    echo "  -p <profile>, --profile <profile>"
-    echo "                         Specify the AWS profile to use (optional)."
-    echo "  -h, --help             Show this help message and exit."
-    echo
+    echo "  -c, --pipeline-name   Specify CodePipeline name (optional, supports wildcards)"
+    echo "  -p, --profile         Specify AWS CLI profile (optional)"
+    echo "  -h, --help            Show this help message"
     exit 0
 }
 
-# Parse command-line arguments
+# Parse CLI arguments
 while [[ $# -gt 0 ]]; do
-    case $1 in
-        -c|--pipeline-name)
-            pipeline_name="$2"
-            shift 2 
-            ;;
-        -p|--profile)
-            profile="$2"  # Set PROFILE to the next argument
-            shift 2
-            ;;
-        -h|--help)
-            usage  # Display help and exit
-            ;;
-        *)
-            echo "Invalid option: $1" >&2
-            usage
-            exit 1
-            ;;
+    case "$1" in
+        -c|--pipeline-name) pipeline_name="$2"; shift 2 ;;
+        -p|--profile)       profile="$2"; shift 2 ;;
+        -h|--help)          usage ;;
+        *) echo "Invalid option: $1" >&2; usage ;;
     esac
 done
 
-# Resolve pipeline name if it contains a wildcard
-if [[ "$pipeline_name" == *"*"* ]]; then    
-    # Fetch the list of pipelines
-    if [[ -n "$profile" ]]; then
-        pipelines=$(aws codepipeline list-pipelines --profile "$profile" --query "pipelines[?contains(name, '${pipeline_name//\*/}')].name" --output text)
-    else
-        pipelines=$(aws codepipeline list-pipelines --query "pipelines[?contains(name, '${pipeline_name//\*/}')].name" --output text)
-    fi
-    
-    if [[ -z "$pipelines" ]]; then
-        echo "Error: No pipeline names match the pattern: $pipeline_name"
+# Ensure required tools are installed
+for tool in aws jq yarn unzip; do
+    if ! command -v "$tool" &>/dev/null; then
+        echo "❌ Required tool '$tool' is not installed. Exiting."
         exit 1
     fi
-    
-    # Check if there are multiple matches
+done
+
+# Resolve wildcard pipeline name if needed
+if [[ "$pipeline_name" == *"*"* ]]; then
+    echo "🔍 Resolving wildcard pipeline name..."
+    query_string="pipelines[?contains(name, '${pipeline_name//\*/}')].name"
+    if [[ -n "$profile" ]]; then
+        pipelines=$(aws codepipeline list-pipelines --profile "$profile" --query "$query_string" --output text)
+    else
+        pipelines=$(aws codepipeline list-pipelines --query "$query_string" --output text)
+    fi
+
+    if [[ -z "$pipelines" ]]; then
+        echo "❌ No pipeline names match the pattern: $pipeline_name"
+        exit 1
+    fi
+
     pipeline_count=$(echo "$pipelines" | wc -l)
     if [[ "$pipeline_count" -gt 1 ]]; then
-        echo "Error: Multiple pipelines match the pattern: $pipeline_name"
+        echo "❌ Multiple pipelines match the pattern: $pipeline_name"
         echo "Matched pipelines:"
         echo "$pipelines"
         exit 1
     fi
-    
-    # Use the resolved pipeline name
+
     pipeline_name="$pipelines"
-    echo "Resolved pipeline name: $pipeline_name"
+    echo "✅ Resolved pipeline name: $pipeline_name"
 fi
 
-pushd ./model_deploy
-echo 'Installing dependencies'
+pushd ./model_deploy > /dev/null
+
+echo "📦 Installing dependencies..."
 yarn install --check-files
 
 if [[ -z "$pipeline_name" ]]; then
-    model_package_name=$(cat ${CODEBUILD_SRC_DIR_PipelineOutput}/pipelineExecution.json | jq ".arn" -r)
-    echo MODEL_PACKAGE_NAME=${model_package_name}
+    model_package_name=$(jq -r ".arn" < "${CODEBUILD_SRC_DIR_PipelineOutput}/pipelineExecution.json")
+    echo "📌 MODEL_PACKAGE_NAME=${model_package_name}"
 else
+    echo "🔎 Fetching latest successful execution for pipeline: $pipeline_name"
     action_name="MLPipeline"
-    
-    # Get the latest execution ID of the pipeline with 'Succeeded' status
+
+    query_execution_id="pipelineExecutionSummaries[?status=='Succeeded'] | [0].pipelineExecutionId"
     if [[ -n "$profile" ]]; then
         execution_id=$(aws codepipeline list-pipeline-executions --profile "$profile" \
-            --pipeline-name "$pipeline_name" \
-            --query "pipelineExecutionSummaries[?status=='Succeeded'] | [0].pipelineExecutionId" \
-            --output text)
+            --pipeline-name "$pipeline_name" --query "$query_execution_id" --output text)
     else
         execution_id=$(aws codepipeline list-pipeline-executions \
-            --pipeline-name "$pipeline_name" \
-            --query "pipelineExecutionSummaries[?status=='Succeeded'] | [0].pipelineExecutionId" \
-            --output text)
+            --pipeline-name "$pipeline_name" --query "$query_execution_id" --output text)
     fi
 
     if [[ -z "$execution_id" ]]; then
-        echo "No executions found for pipeline: $pipeline_name"
+        echo "❌ No successful executions found for pipeline: $pipeline_name"
         exit 1
     fi
 
-    # Get details of the stage's output artifacts for the latest execution
+    echo "📄 Execution ID: $execution_id"
+
+    # Fetch output artifact info
     if [[ -n "$profile" ]]; then
         output=$(aws codepipeline list-action-executions --profile "$profile" \
             --pipeline-name "$pipeline_name" \
             --filter pipelineExecutionId="$execution_id" \
             --no-paginate \
-            --query "actionExecutionDetails[?actionName=='MLPipeline'].output[].outputArtifacts[]")
+            --query "actionExecutionDetails[?actionName=='$action_name'].output[].outputArtifacts[]")
     else
         output=$(aws codepipeline list-action-executions \
             --pipeline-name "$pipeline_name" \
             --filter pipelineExecutionId="$execution_id" \
             --no-paginate \
-            --query "actionExecutionDetails[?actionName=='MLPipeline'].output[].outputArtifacts[]")
+            --query "actionExecutionDetails[?actionName=='$action_name'].output[].outputArtifacts[]")
     fi
 
     if [[ "$output" == "[]" ]]; then
-        echo "No output artifacts found for stage: $action_name in execution: $execution_id"
+        echo "❌ No output artifacts found for stage: $action_name in execution: $execution_id"
         exit 1
     fi
 
-    # Parse and download artifact
     artifact_s3_path=$(echo "$output" | jq -r '.[] | "s3://\(.s3location.bucket)/\(.s3location.key)"')
+    echo "⬇️  Downloading artifact: $artifact_s3_path"
+
     if [[ -n "$profile" ]]; then
         aws s3 cp --quiet "$artifact_s3_path" artifact.zip --profile "$profile"
     else
         aws s3 cp --quiet "$artifact_s3_path" artifact.zip
     fi
 
-    # Check if the file exists
     if [[ ! -f artifact.zip ]]; then
-        echo "Error: Artifact zip file was not downloaded."
+        echo "❌ Artifact zip file was not downloaded."
         exit 1
     fi
-    unzip -o -q artifact.zip 'pipelineExecution.json'
 
-    # Check for extraction errors
-    if [[ $? -ne 0 ]]; then
-        echo "Error: Failed to extract files from artifact.zip."
+    echo "📂 Extracting pipelineExecution.json..."
+    unzip -o -q artifact.zip 'pipelineExecution.json' || {
+        echo "❌ Failed to extract pipelineExecution.json"
         exit 1
-    fi
+    }
+
     rm artifact.zip
 
-    model_package_name=$(cat pipelineExecution.json | jq ".arn" -r)
-    echo MODEL_PACKAGE_NAME=${model_package_name}
+    model_package_name=$(jq -r ".arn" < pipelineExecution.json)
+    echo "📌 MODEL_PACKAGE_NAME=${model_package_name}"
 fi
 
 if [[ "$model_package_name" == "NotTrained" ]]; then
-    echo "Model not trained yet..."
+    echo "⚠️ Model not trained yet. Skipping deployment."
     exit 1
 fi
 
-echo 'Deploying Model in your AWS account'
+echo "🚀 Deploying model to AWS..."
 if [[ -n "$profile" ]]; then
-    yarn cdk deploy --require-approval never --parameters modelPackageName=${model_package_name} --profile "$profile" --app cdk.out/
+    yarn cdk deploy --require-approval never --parameters modelPackageName="$model_package_name" --profile "$profile" --app cdk.out/
 else
-    yarn cdk deploy --require-approval never --parameters modelPackageName=${model_package_name} --app cdk.out/
+    yarn cdk deploy --require-approval never --parameters modelPackageName="$model_package_name" --app cdk.out/
 fi
-popd
+
+popd > /dev/null
