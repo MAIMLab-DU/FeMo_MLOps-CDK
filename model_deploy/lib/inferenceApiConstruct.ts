@@ -15,7 +15,7 @@ export interface InferencApiConstructProps {
     readonly modelPackageName: string;
     readonly sageMakeEndpointArn: string;
     readonly sageMakerEndpointName: string;
-    readonly inferenceResultTable: dynamodb.Table;
+    readonly inferenceResultTable: dynamodb.ITable;
     readonly customDomainName?: string; // Optional custom domain name
     readonly acmCertificateArn?: string; // Optional ACM certificate ARN
 }
