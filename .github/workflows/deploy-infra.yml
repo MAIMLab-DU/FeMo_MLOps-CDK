@@ -45,8 +45,6 @@ jobs:
 
       - name: CI check
         run: |
-          set -e
-
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             TARGET_BRANCH="${{ github.base_ref }}"
           else
@@ -71,9 +69,7 @@ jobs:
       - name: Deploy CDK Stack to AWS
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
-          set -e
           pushd ./infrastructure
-
           if [[ "${{ github.ref_name }}" == "dev" ]]; then
             yarn cdk deploy --require-approval never --parameters projectConfigPath="${{ secrets.DEV_CONFIG_PATH }}" --profile "${{ secrets.DEV_AWS_PROFILE }}" --app cdk.out/
 

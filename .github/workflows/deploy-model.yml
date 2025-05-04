@@ -45,8 +45,6 @@ jobs:
 
       - name: Build Deployment Stack
         run: |
-          set -e  # Exit immediately if a command fails
-
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             TARGET_BRANCH="${{ github.base_ref }}"
           else
@@ -79,7 +77,6 @@ jobs:
       - name: Deploy Latest Model to AWS
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
-          set -e
           projectName=$(cat ./configuration/projectConfig.json | jq -r ".projectName")
           if [[ "${{ github.ref_name }}" == "dev" ]]; then
             bash scripts/deploy.sh -c "${projectName}-MLOpsInfraStack-*" -p "${{ secrets.DEV_AWS_PROFILE }}"
