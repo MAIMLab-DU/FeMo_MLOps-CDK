@@ -5,6 +5,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 profile=""
 
+# Detect OS (for venv path differences)
+OS_TYPE="$(uname | tr '[:upper:]' '[:lower:]')"
+
 # Usage function
 function usage {
     echo "Usage: $0 [-p|--profile <profile>] [-h|--help]"
@@ -40,7 +43,12 @@ done
 pushd $SCRIPT_DIR/../model_deploy
 
 python3 -m venv .venv
-source .venv/bin/activate
+# Detect platform-specific venv activation
+if [[ "$OS_TYPE" == "mingw"* || "$OS_TYPE" == "msys"* || "$OS_TYPE" == "windows_nt" ]]; then
+  source .venv/Scripts/activate
+else
+  source .venv/bin/activate
+fi
 pip install ruff==0.6.4
 ruff check ***/**/*.py
 deactivate

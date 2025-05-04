@@ -8,6 +8,9 @@ UPLOAD_FLAG=false
 CONFIG_S3_PATH=""
 PROFILE=""
 
+# Detect OS (for venv path differences)
+OS_TYPE="$(uname | tr '[:upper:]' '[:lower:]')"
+
 # Function to display help
 function show_help {
   echo "Usage: $0 [-u|--upload] -c <CONFIG_S3_PATH> [-p|--profile <PROFILE>] [-h|--help]"
@@ -122,7 +125,12 @@ pushd $SCRIPT_DIR/../infrastructure
 # Run checks and setup for the dataSourceMonitor function
 pushd ./functions/dataSourceMonitor
 python3 -m venv .venv
-source .venv/bin/activate
+# Detect platform-specific venv activation
+if [[ "$OS_TYPE" == "mingw"* || "$OS_TYPE" == "msys"* || "$OS_TYPE" == "windows_nt" ]]; then
+  source .venv/Scripts/activate
+else
+  source .venv/bin/activate
+fi
 pip install ruff==0.6.4
 ruff check *.py
 deactivate
