@@ -52,7 +52,7 @@ done
 
 # Download configuration
 echo "⬇️  Downloading '$CONFIG_LOCAL_PATH' from '$CONFIG_S3_PATH'..."
-[[ -n "$PROFILE" ]] && aws s3 cp --quiet "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH" --profile "$PROFILE" || \
+[[ -n "$profile" ]] && aws s3 cp --quiet "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH" --profile "$profile" || \
                       aws s3 cp --quiet "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH"
 
 pushd "$SCRIPT_DIR/../model_deploy"
