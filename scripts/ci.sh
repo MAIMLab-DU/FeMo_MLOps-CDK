@@ -1,8 +1,9 @@
 #!/bin/bash
 
 set -e
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_LOCAL_PATH="configuration/projectConfig.json"
+CONFIG_LOCAL_PATH="$SCRIPT_DIR/../configuration/projectConfig.json"
 
 UPLOAD_FLAG=false
 CONFIG_S3_PATH=""
@@ -11,138 +12,131 @@ PROFILE=""
 # Detect OS (for venv path differences)
 OS_TYPE="$(uname | tr '[:upper:]' '[:lower:]')"
 
-# Function to display help
-function show_help {
+# Display help
+show_help() {
   echo "Usage: $0 [-u|--upload] -c <CONFIG_S3_PATH> [-p|--profile <PROFILE>] [-h|--help]"
   echo
   echo "Options:"
   echo "  -u, --upload           Upload the configuration file to S3 before downloading it."
-  echo "  -c <CONFIG_S3_PATH>, --config-s3-path <CONFIG_S3_PATH>"
-  echo "                         Specify the S3 path for the configuration file."
-  echo "  -p <PROFILE>, --profile <PROFILE>"
-  echo "                         Specify the AWS profile to use (optional)."
+  echo "  -c, --config-s3-path   S3 path for the configuration file (e.g., s3://bucket/key.json)"
+  echo "  -p, --profile          AWS profile to use (optional)."
   echo "  -h, --help             Show this help message and exit."
   echo
   exit 0
 }
 
-function upload_to_s3 {
-  # Extract bucket name and object key from CONFIG_S3_PATH
+upload_to_s3() {
+  echo "🔼 Uploading config to S3 if modified..."
+  local bucket_name object_key REMOTE_ETAG LOCAL_MD5
+
   bucket_name=$(echo "$CONFIG_S3_PATH" | cut -d'/' -f3)
   object_key=$(echo "$CONFIG_S3_PATH" | cut -d'/' -f4-)
-  # Get current ETag from S3
+
+  # Fetch ETag from S3
   if [[ -n "$PROFILE" ]]; then
-    REMOTE_ETAG=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" --query "ETag" --profile "$PROFILE" --output text 2>/dev/null | tr -d '"')
+    REMOTE_ETAG=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" \
+                  --profile "$PROFILE" --query "ETag" --output text 2>/dev/null | tr -d '"')
   else
-    REMOTE_ETAG=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" --query "ETag" --output text 2>/dev/null | tr -d '"')
+    REMOTE_ETAG=$(aws s3api head-object --bucket "$bucket_name" --key "$object_key" \
+                  --query "ETag" --output text 2>/dev/null | tr -d '"')
   fi
 
-  # Check if the file exists in S3
+  # Upload if not present or changed
   if [[ -z "$REMOTE_ETAG" ]]; then
-    echo "No existing object found in S3. Uploading..."
-    if [[ -n "$PROFILE" ]]; then
-      aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
-    else
-      aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH"
-    fi
+    echo "🆕 No existing object found in S3. Uploading new file..."
+    [[ -n "$PROFILE" ]] && aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE" || \
+                          aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH"
     return
   fi
 
-  # Calculate MD5 checksum of the local file
   LOCAL_MD5=$(md5sum "$CONFIG_LOCAL_PATH" | awk '{print $1}')
 
-  # Compare and upload only if different
   if [[ "$REMOTE_ETAG" != "$LOCAL_MD5" ]]; then
-    echo "Uploading modified object to S3..."
-    if [[ -n "$PROFILE" ]]; then
-      aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE"
-    else
-      aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH"
-    fi
+    echo "♻️  Detected change in config. Uploading updated file..."
+    [[ -n "$PROFILE" ]] && aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH" --profile "$PROFILE" || \
+                          aws s3 cp --quiet "$CONFIG_LOCAL_PATH" "$CONFIG_S3_PATH"
   else
-    echo "No changes detected. Skipping upload."
+    echo "✅ No changes detected in config. Skipping upload."
   fi
 }
 
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do
-  case $1 in
+  case "$1" in
     -u|--upload)
-      UPLOAD_FLAG=true  # Set the upload flag to true
+      UPLOAD_FLAG=true
       shift
       ;;
     -c|--config-s3-path)
-      CONFIG_S3_PATH="$2"  # Set CONFIG_S3_PATH to the next argument
-      shift
-      shift
+      CONFIG_S3_PATH="$2"
+      shift 2
       ;;
     -p|--profile)
-      PROFILE="$2"  # Set PROFILE to the next argument
-      shift
-      shift
+      PROFILE="$2"
+      shift 2
       ;;
     -h|--help)
-      show_help  # Display help and exit
+      show_help
       ;;
     *)
-      echo "Invalid option: $1" >&2
+      echo "❌ Invalid option: $1"
       echo "Use -h or --help for usage information."
       exit 1
       ;;
   esac
 done
 
-# Validate that CONFIG_S3_PATH and ENVIRONMENT are provided
+# Validation
 if [[ -z "$CONFIG_S3_PATH" ]]; then
-  echo "Error: CONFIG_S3_PATH must be specified with -c or --config-s3-path." >&2
-  echo "Use -h or --help for usage information."
+  echo "❌ Error: CONFIG_S3_PATH must be specified with -c or --config-s3-path."
   exit 1
 fi
 
-# Validate CONFIG_S3_PATH format
 if [[ ! "$CONFIG_S3_PATH" =~ ^s3://[^/]+/.+\.json$ ]]; then
-  echo "Error: CONFIG_S3_PATH must be in the format 's3://bucket/key.json'"
+  echo "❌ Error: CONFIG_S3_PATH must be in the format 's3://bucket/key.json'"
   exit 1
 fi
 
-
-# If upload flag is set, upload the $S3_KEY file to S3
+# Upload if flagged
 if [[ "$UPLOAD_FLAG" == true ]]; then
   upload_to_s3
 fi
 
-# Download the configuration file from S3
-echo "Downloading '$CONFIG_LOCAL_PATH' from S3 path '$CONFIG_S3_PATH'..."
-if [[ -n "$PROFILE" ]]; then
-  aws s3 cp --quiet "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH" --profile "$PROFILE"
-else
-  aws s3 cp --quiet "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH"
-fi
+# Download configuration
+echo "⬇️  Downloading '$CONFIG_LOCAL_PATH' from '$CONFIG_S3_PATH'..."
+[[ -n "$PROFILE" ]] && aws s3 cp --quiet "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH" --profile "$PROFILE" || \
+                      aws s3 cp --quiet "$CONFIG_S3_PATH" "$CONFIG_LOCAL_PATH"
 
-# Navigate to the infrastructure directory
-pushd $SCRIPT_DIR/../infrastructure
+# Navigate to infrastructure directory
+pushd "$SCRIPT_DIR/../infrastructure" > /dev/null
 
-# Run checks and setup for the dataSourceMonitor function
-pushd ./functions/dataSourceMonitor
+# Python linting in function folder
+pushd ./functions/dataSourceMonitor > /dev/null
+echo "🐍 Setting up Python venv for ruff..."
 python3 -m venv .venv
-# Detect platform-specific venv activation
 if [[ "$OS_TYPE" == "mingw"* || "$OS_TYPE" == "msys"* || "$OS_TYPE" == "windows_nt" ]]; then
   source .venv/Scripts/activate
 else
   source .venv/bin/activate
 fi
+
 pip install ruff==0.6.4
 ruff check *.py
 deactivate
-popd
+popd > /dev/null
 
 # Run Yarn commands
+echo "📦 Installing Node.js dependencies and building..."
 yarn install --frozen-lockfile
 yarn lint
 yarn build
+
+# Synthesize CDK
+echo "📐 Synthesizing CDK app..."
 if [[ -n "$PROFILE" ]]; then
   yarn cdk synth --parameter projectConfigPath="$CONFIG_S3_PATH" --profile "$PROFILE" --verbose > template.yml
 else
   yarn cdk synth --parameter projectConfigPath="$CONFIG_S3_PATH" --verbose > template.yml
 fi
-popd
+
+popd > /dev/null

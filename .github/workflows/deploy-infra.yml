@@ -60,12 +60,10 @@ jobs:
 
           if [[ "$TARGET_BRANCH" == "dev" ]]; then
             bash scripts/create_aws_profile.sh -p "${{ secrets.DEV_AWS_PROFILE }}" -i "${{ secrets.DEV_ACCESS_KEY_ID }}" -k "${{ secrets.DEV_SECRET_ACCESS_KEY }}" -r "${{ secrets.DEV_REGION }}"
-            echo "${{ secrets.DEV_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
             bash scripts/ci.sh -c "${{ secrets.DEV_CONFIG_PATH }}" -p "${{ secrets.DEV_AWS_PROFILE }}" --upload
 
           elif [[ "$TARGET_BRANCH" == "main" ]]; then
             bash scripts/create_aws_profile.sh -p "${{ secrets.PROD_AWS_PROFILE }}" -i "${{ secrets.PROD_ACCESS_KEY_ID }}" -k "${{ secrets.PROD_SECRET_ACCESS_KEY }}" -r "${{ secrets.PROD_REGION }}"
-            echo "${{ secrets.PROD_PROJECT_CONFIG }}" | base64 -d > configuration/projectConfig.json
             bash scripts/ci.sh -c "${{ secrets.PROD_CONFIG_PATH }}" -p "${{ secrets.PROD_AWS_PROFILE }}" --upload
 
           else

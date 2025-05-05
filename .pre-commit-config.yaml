@@ -1,0 +1,25 @@
+repos:
+  - repo: local
+    hooks:
+      - id: precommit-shell
+        name: yarn linting
+        entry: bash scripts/precommit.sh
+        language: system
+        types: [file]
+        always_run: true
+        pass_filenames: false
+
+  # ✅ Ruff linter (via community pre-commit wrapper)
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.4.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+        language_version: python3
+        files: ^(model_deploy/functions/.*\.py|infrastructure/functions/dataSourceMonitor/.*\.py)$
+
+  # ✅ Code hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: check-added-large-files
