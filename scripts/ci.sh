@@ -3,7 +3,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_LOCAL_PATH="configuration/projectConfig.json"
+CONFIG_LOCAL_PATH="$SCRIPT_DIR/../configuration/projectConfig.json"
 
 UPLOAD_FLAG=false
 CONFIG_S3_PATH=""
