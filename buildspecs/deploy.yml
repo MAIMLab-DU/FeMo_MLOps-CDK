@@ -13,7 +13,7 @@ phases:
 
   build:
     commands:
-      - bash scripts/build_deploy.sh
+      - bash scripts/build_deploy.sh -c "$CONFIG_S3_PATH"
       - bash scripts/deploy.sh
 
 artifacts:

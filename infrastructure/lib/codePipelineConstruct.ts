@@ -412,6 +412,10 @@ export class CodePipelineConstruct extends Construct {
                     type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
                     value: Stack.of(this).region,
                 },
+                CONFIG_S3_PATH: {
+                    type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+                    value: props.projectConfigPath,
+                },
             },
         });
 
