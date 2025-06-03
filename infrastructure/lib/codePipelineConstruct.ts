@@ -367,6 +367,19 @@ export class CodePipelineConstruct extends Construct {
             })
         );
 
+        // Add permission for project config path
+        const configS3Path = props.projectConfigPath;
+        const configBucketName = configS3Path.split('/')[2]; // Extract bucket name from s3://bucket-name/path
+        const configBucketArn = `arn:aws:s3:::${configBucketName}`;
+        const configObjectArn = `${configBucketArn}/*`;
+
+        deployRole.addToPolicy(
+            new iam.PolicyStatement({
+                actions: ['s3:GetObject', 's3:ListBucket'],
+                resources: [configBucketArn, configObjectArn],
+            })
+        );
+
         deployRole.addToPolicy(
             new iam.PolicyStatement({
                 actions: ['route53:ListHostedZonesByName'],
