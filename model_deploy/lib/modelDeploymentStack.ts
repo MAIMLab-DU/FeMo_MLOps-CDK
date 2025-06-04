@@ -10,6 +10,9 @@ import * as sagemaker from 'aws-cdk-lib/aws-sagemaker';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as customResource from 'aws-cdk-lib/custom-resources';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as applicationautoscaling from 'aws-cdk-lib/aws-applicationautoscaling';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 
 export interface ModelDeploymentStackProps extends StackProps {
     modelEndpointExportNamePrefix: string;
@@ -21,6 +24,17 @@ export interface ModelDeploymentStackProps extends StackProps {
     acmCertificateArn?: string;
     inferenceResultsTableArn?: string;
     inferenceResultsBucketName?: string;
+    // Auto scaling configuration from projectConfig
+    autoScaling?: {
+        enabled?: boolean;
+        minCapacity?: number;
+        maxCapacity?: number;
+        invocationsPerInstanceTarget?: number;
+        enableBacklogScaling?: boolean;
+        backlogSizePerInstanceTarget?: number;
+        scaleOutCooldown?: number;
+        scaleInCooldown?: number;
+    };
 }
 
 export class ModelDeploymentStack extends Stack {
@@ -133,6 +147,20 @@ export class ModelDeploymentStack extends Stack {
 
         executionRole.applyRemovalPolicy(RemovalPolicy.DESTROY);
 
+        // Create SNS topics for async inference notifications
+        const asyncSuccessTopic = new sns.Topic(this, 'AsyncInferenceSuccessTopic', {
+            topicName: `${props.projectName}-async-inference-success`,
+        });
+
+        const asyncErrorTopic = new sns.Topic(this, 'AsyncInferenceErrorTopic', {
+            topicName: `${props.projectName}-async-inference-error`,
+        });
+
+        // Grant SageMaker permissions for async inference
+        inferenceResultsBucket.grantReadWrite(executionRole);
+        asyncSuccessTopic.grantPublish(executionRole);
+        asyncErrorTopic.grantPublish(executionRole);
+
         const inferenceModelFunctionRole = new iam.Role(this, 'InferenceModelFunctionRole', {
             assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
             managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole')],
@@ -196,11 +224,24 @@ export class ModelDeploymentStack extends Stack {
                 {
                     initialInstanceCount: props.endpointInstanceCount || 1,
                     initialVariantWeight: 1.0,
-                    instanceType: props.endpointInstanceType || 'ml.c5.xlarge',
+                    instanceType: props.endpointInstanceType || 'ml.m5.2xlarge',
                     modelName: inferenceModelCustomResource.ref,
                     variantName: 'AllTraffic',
                 },
             ],
+            asyncInferenceConfig: {
+                outputConfig: {
+                    s3OutputPath: `s3://${inferenceResultsBucket.bucketName}/output/`,
+                    s3FailurePath: `s3://${inferenceResultsBucket.bucketName}/failure/`,
+                    notificationConfig: {
+                        successTopic: asyncSuccessTopic.topicArn,
+                        errorTopic: asyncErrorTopic.topicArn,
+                    },
+                },
+                clientConfig: {
+                    maxConcurrentInvocationsPerInstance: 2,
+                },
+            },
         });
 
         endpointConfig.node.addDependency(inferenceModelCustomResource);
@@ -211,6 +252,40 @@ export class ModelDeploymentStack extends Stack {
 
         endpoint.node.addDependency(endpointConfig);
 
+        // Add auto scaling for the endpoint if enabled
+        if (props.autoScaling?.enabled !== false) {
+            const autoScalingConfig = props.autoScaling || {};
+
+            const scalingTarget = new applicationautoscaling.ScalableTarget(this, 'SageMakerEndpointScalingTarget', {
+                serviceNamespace: applicationautoscaling.ServiceNamespace.SAGEMAKER,
+                resourceId: `endpoint/${endpoint.getAtt('EndpointName').toString()}/variant/AllTraffic`,
+                scalableDimension: 'sagemaker:variant:DesiredInstanceCount',
+                minCapacity: autoScalingConfig.minCapacity || 0, // default scale down to zero instance
+                maxCapacity: autoScalingConfig.maxCapacity || 2,
+            });
+
+            scalingTarget.node.addDependency(endpoint);
+
+            // 2. Scale based on approximate backlog size per instance (for async inference)
+            const backlogMetric = new cloudwatch.Metric({
+                namespace: 'AWS/SageMaker',
+                metricName: 'ApproximateBacklogSizePerInstance',
+                dimensionsMap: {
+                    EndpointName: endpoint.getAtt('EndpointName').toString(),
+                },
+                statistic: cloudwatch.Statistic.AVERAGE,
+                period: Duration.minutes(1),
+            });
+
+            new applicationautoscaling.TargetTrackingScalingPolicy(this, 'BacklogScalingPolicy', {
+                scalingTarget: scalingTarget,
+                targetValue: autoScalingConfig.backlogSizePerInstanceTarget || 1.0,
+                customMetric: backlogMetric,
+                scaleInCooldown: Duration.seconds(autoScalingConfig.scaleInCooldown || 1800),
+                scaleOutCooldown: Duration.seconds(autoScalingConfig.scaleOutCooldown || 120),
+            });
+        }
+
         const apiConstruct = new InferenceApiConstruct(this, 'InferenceAPIConstruct', {
             ipCIDRBlocks: props.ipPermitList,
             modelPackageName: modelPackageName.valueAsString,
@@ -220,6 +295,8 @@ export class ModelDeploymentStack extends Stack {
             inferenceResultsBucket: inferenceResultsBucket,
             customDomainName: props.customDomainName,
             acmCertificateArn: props.acmCertificateArn,
+            asyncSuccessTopic: asyncSuccessTopic,
+            asyncErrorTopic: asyncErrorTopic,
         });
 
         apiConstruct.node.addDependency(endpoint);

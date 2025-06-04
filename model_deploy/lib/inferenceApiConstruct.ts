@@ -6,6 +6,8 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
@@ -20,6 +22,8 @@ export interface InferencApiConstructProps {
     readonly inferenceResultsBucket: s3.IBucket;
     readonly customDomainName?: string; // Optional custom domain name
     readonly acmCertificateArn?: string; // Optional ACM certificate ARN
+    readonly asyncSuccessTopic: sns.ITopic; // SNS topic for successful async inference
+    readonly asyncErrorTopic: sns.ITopic; // SNS topic for failed async inference
 }
 
 /**
@@ -121,8 +125,14 @@ export class InferenceApiConstruct extends Construct {
                 SAGEMAKER_ENDPOINT_NAME: props.sageMakerEndpointName,
                 DYNAMODB_TABLE_NAME: props.inferenceResultTable.tableName,
                 INFERENCE_RESULTS_BUCKET: props.inferenceResultsBucket.bucketName,
+                ASYNC_SUCCESS_TOPIC_ARN: props.asyncSuccessTopic.topicArn,
+                ASYNC_ERROR_TOPIC_ARN: props.asyncErrorTopic.topicArn,
             },
         });
+
+        // Subscribe the Lambda function to SNS topics for async inference notifications
+        props.asyncSuccessTopic.addSubscription(new snsSubscriptions.LambdaSubscription(inferenceApiFunction));
+        props.asyncErrorTopic.addSubscription(new snsSubscriptions.LambdaSubscription(inferenceApiFunction));
 
         const inferenceIntegration = new apigateway.LambdaIntegration(inferenceApiFunction);
 

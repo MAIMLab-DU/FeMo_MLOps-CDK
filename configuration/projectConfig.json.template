@@ -18,5 +18,13 @@
     "modelEndpointExportNamePrefix": "ModelHostingEndpoint",
     "ipPermitList": [
         "0.0.0.0/0"
-    ]
+    ],
+    "autoScaling": {
+        "enabled": true,
+        "minCapacity": 0,
+        "maxCapacity": 2,
+        "backlogSizePerInstanceTarget": 1.0,
+        "scaleOutCooldown": 120,
+        "scaleInCooldown": 300
+    }
 }
