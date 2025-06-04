@@ -211,8 +211,6 @@ export class ModelDeploymentStack extends Stack {
                 modelPackageName: modelPackageName.valueAsString,
                 sagemakerExecutionRole: executionRole.roleArn,
                 projectName: props.projectName,
-                inferenceResultTable: inferenceResultTable.tableName,
-                inferenceResultsBucket: inferenceResultsBucket.bucketName,
             },
         });
 
@@ -279,10 +277,10 @@ export class ModelDeploymentStack extends Stack {
 
             new applicationautoscaling.TargetTrackingScalingPolicy(this, 'BacklogScalingPolicy', {
                 scalingTarget: scalingTarget,
-                targetValue: autoScalingConfig.backlogSizePerInstanceTarget || 1.0,
+                targetValue: autoScalingConfig.backlogSizePerInstanceTarget || 0.5,
                 customMetric: backlogMetric,
-                scaleInCooldown: Duration.seconds(autoScalingConfig.scaleInCooldown || 1800),
-                scaleOutCooldown: Duration.seconds(autoScalingConfig.scaleOutCooldown || 120),
+                scaleInCooldown: Duration.seconds(autoScalingConfig.scaleInCooldown || 2400), // 40 minutes - assuming 20-30 minute processing time
+                scaleOutCooldown: Duration.seconds(autoScalingConfig.scaleOutCooldown || 60), // 1 minute - fast response to new requests
             });
         }
 

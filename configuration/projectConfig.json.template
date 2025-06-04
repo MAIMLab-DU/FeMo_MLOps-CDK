@@ -24,7 +24,7 @@
         "minCapacity": 0,
         "maxCapacity": 2,
         "backlogSizePerInstanceTarget": 1.0,
-        "scaleOutCooldown": 120,
-        "scaleInCooldown": 300
+        "scaleOutCooldown": 60,
+        "scaleInCooldown": 2400
     }
 }
