@@ -4,6 +4,7 @@ import { Stack, StackProps, CfnParameter, CustomResource, CfnOutput, Duration, R
 import { InferenceApiConstruct } from './inferenceApiConstruct';
 import * as path from 'path';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as sagemaker from 'aws-cdk-lib/aws-sagemaker';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
@@ -19,6 +20,7 @@ export interface ModelDeploymentStackProps extends StackProps {
     customDomainName?: string;
     acmCertificateArn?: string;
     inferenceResultsTableArn?: string;
+    inferenceResultsBucketName?: string;
 }
 
 export class ModelDeploymentStack extends Stack {
@@ -32,6 +34,7 @@ export class ModelDeploymentStack extends Stack {
         });
 
         let inferenceResultTable: dynamodb.ITable;
+        let inferenceResultsBucket: s3.IBucket;
 
         if (props.inferenceResultsTableArn) {
             inferenceResultTable = dynamodb.Table.fromTableArn(
@@ -62,6 +65,23 @@ export class ModelDeploymentStack extends Stack {
             type: 'String',
             default: 'NotTrained',
         });
+
+        // Check if an existing bucket is passed; otherwise, create a new bucket
+        if (props.inferenceResultsBucketName) {
+            inferenceResultsBucket = s3.Bucket.fromBucketName(
+                this,
+                'InferenceResultsBucket',
+                props.inferenceResultsBucketName
+            );
+        } else {
+            inferenceResultsBucket = new s3.Bucket(this, 'InferenceResultsBucket', {
+                blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+                encryption: s3.BucketEncryption.S3_MANAGED,
+                enforceSSL: true,
+                versioned: true,
+                publicReadAccess: false,
+            });
+        }
 
         const executionRole = new iam.Role(this, 'SageMakerModelExecutionRole', {
             assumedBy: new iam.ServicePrincipal('sagemaker.amazonaws.com'),
@@ -164,6 +184,7 @@ export class ModelDeploymentStack extends Stack {
                 sagemakerExecutionRole: executionRole.roleArn,
                 projectName: props.projectName,
                 inferenceResultTable: inferenceResultTable.tableName,
+                inferenceResultsBucket: inferenceResultsBucket.bucketName,
             },
         });
 
@@ -196,6 +217,7 @@ export class ModelDeploymentStack extends Stack {
             sageMakeEndpointArn: endpoint.ref,
             sageMakerEndpointName: endpoint.getAtt('EndpointName').toString(),
             inferenceResultTable: inferenceResultTable,
+            inferenceResultsBucket: inferenceResultsBucket,
             customDomainName: props.customDomainName,
             acmCertificateArn: props.acmCertificateArn,
         });

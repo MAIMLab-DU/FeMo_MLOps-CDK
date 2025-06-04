@@ -3,6 +3,7 @@ import { Construct } from 'constructs';
 import { Duration, Token } from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as route53 from 'aws-cdk-lib/aws-route53';
@@ -16,6 +17,7 @@ export interface InferencApiConstructProps {
     readonly sageMakeEndpointArn: string;
     readonly sageMakerEndpointName: string;
     readonly inferenceResultTable: dynamodb.ITable;
+    readonly inferenceResultsBucket: s3.IBucket;
     readonly customDomainName?: string; // Optional custom domain name
     readonly acmCertificateArn?: string; // Optional ACM certificate ARN
 }
@@ -93,6 +95,14 @@ export class InferenceApiConstruct extends Construct {
         inferenceApiFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
+                Action: ['s3:GetObject', 's3:PutObject'],
+                Resource: [`${props.inferenceResultsBucket.bucketArn}/*`],
+            })
+        );
+
+        inferenceApiFunctionRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
                 Action: ['sagemaker:InvokeEndpoint'],
                 Resource: [props.sageMakeEndpointArn],
             })
@@ -110,6 +120,7 @@ export class InferenceApiConstruct extends Construct {
                 MODEL_PACKAGE_NAME: props.modelPackageName,
                 SAGEMAKER_ENDPOINT_NAME: props.sageMakerEndpointName,
                 DYNAMODB_TABLE_NAME: props.inferenceResultTable.tableName,
+                INFERENCE_RESULTS_BUCKET: props.inferenceResultsBucket.bucketName,
             },
         });
 
