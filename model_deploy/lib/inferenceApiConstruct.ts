@@ -105,10 +105,11 @@ export class InferenceApiConstruct extends Construct {
         inferenceApiFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
-                Action: ['s3:GetObject', 's3:PutObject'],
-                Resource: [`${props.inferenceResultsBucket.bucketArn}/*`],
+                Action: ['s3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:ListBucket'],
+                Resource: [props.inferenceResultsBucket.bucketArn, `${props.inferenceResultsBucket.bucketArn}/*`],
             })
         );
+        props.inferenceResultsBucket.grantReadWrite(inferenceApiFunctionRole);
 
         inferenceApiFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
@@ -217,7 +218,7 @@ export class InferenceApiConstruct extends Construct {
             name: 'InferenceApiUsagePlan',
             apiStages: [{ api: this.api, stage: this.api.deploymentStage }],
             throttle: { burstLimit: 500, rateLimit: 1000 },
-            quota: { limit: 10000000, period: apigateway.Period.MONTH },
+            quota: { limit: 1000000, period: apigateway.Period.MONTH },
         });
 
         // Optional Custom Domain Configuration

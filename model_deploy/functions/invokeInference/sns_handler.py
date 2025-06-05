@@ -4,7 +4,10 @@ import boto3
 from datetime import datetime
 from typing import Dict, Any
 from utils import (
-    extract_s3_details
+    extract_s3_details,
+    upload_to_s3,
+    query_table_with_keys,
+    update_item_in_dynamodb
 )
 
 # Initialize AWS clients
@@ -12,6 +15,8 @@ dynamodb = boto3.resource('dynamodb')
 s3_client = boto3.client('s3')
 
 # Environment variables
+model_package_group = os.getenv('MODEL_PACKAGE_NAME').split('/')[-2]
+model_version = f"Version {os.getenv('MODEL_PACKAGE_NAME').split('/')[-1]}"
 table_name = os.environ.get('DYNAMODB_TABLE_NAME')
 inference_results_bucket = os.environ.get('INFERENCE_RESULTS_BUCKET')
 
@@ -62,29 +67,39 @@ def process_success_notification(sns_message: Dict[str, Any], inference_id: str)
     
     try:
         # Extract result information
-        output_location = sns_message.get("responseParameters", {}).get("outputLocation")
+        input_location: str = sns_message.get("requestParameters", {}).get("inputLocation")
+        output_location: str = sns_message.get("responseParameters", {}).get("outputLocation")
         invocation_end_time = sns_message.get("eventTime")
         
         if not output_location:
             raise ValueError("No output location found in success notification")
         
-        # Download and process results from S3
+        # Download and process output from S3
         result_data = download_inference_results(output_location)
+        result_data["modelPackageGroup"] = model_package_group
+        result_data["modelVersion"] = model_version
+        result_data["completionTime"] = invocation_end_time
+
+        result_s3_url = upload_to_s3(
+                s3_client,
+                inference_results_bucket, 
+                input_location.replace("input", "result"), 
+                result_data
+            )
         
         # Update DynamoDB with results
         update_result = update_inference_status(
             inference_id=inference_id,
             status="Completed",
-            result_data=result_data,
-            output_location=output_location,
+            result_location=result_s3_url,
             completion_time=invocation_end_time
         )
         
         return {
             "status": "Completed",
             "jobId": inference_id,
-            "outputS3Url": output_location,
-            "dynamodb_updated": update_result
+            "resultS3Url": result_s3_url,
+            "dynamodbUpdated": update_result
         }
         
     except Exception as e:
@@ -152,16 +167,12 @@ def update_inference_status(inference_id: str, status: str, **kwargs) -> bool:
     
     try:
         # Find the item by jobId = inference_id
-        scan_response = table.scan(
-            FilterExpression="jobId = :id",
-            ExpressionAttributeValues={":id": inference_id}
-        )
-        
-        if not scan_response['Items']:
+        response = query_table_with_keys(table, None, job_id=inference_id)
+        if not response.get('Items'):
             print(f"No item found with jobId: {inference_id}")
             return False
         
-        item = scan_response['Items'][0]
+        item = response['Items'][0]        
         s3_key = item['s3Key']
         request_time = item['timeStamp']
         
@@ -174,7 +185,7 @@ def update_inference_status(inference_id: str, status: str, **kwargs) -> bool:
         if status == "Completed":
             update_attributes.update({
                 "result": {
-                    "outputS3Url": kwargs.get('output_location')
+                    "resultS3Url": kwargs.get('result_location'),
                 }
             })
         elif status == "Failed":
@@ -186,11 +197,11 @@ def update_inference_status(inference_id: str, status: str, **kwargs) -> bool:
             })
         
         # Update the item
-        table.update_item(
-            Key={'s3Key': s3_key, 'timeStamp': request_time},
-            UpdateExpression="SET " + ", ".join([f"#{k} = :{k}" for k in update_attributes.keys()]),
-            ExpressionAttributeNames={f"#{k}": k for k in update_attributes.keys()},
-            ExpressionAttributeValues={f":{k}": v for k, v in update_attributes.items()}
+        update_item_in_dynamodb(
+            table=table,
+            s3_key=s3_key,
+            time_stamp=request_time,
+            update_data=update_attributes
         )
         
         print(f"Successfully updated inference status for {inference_id}")

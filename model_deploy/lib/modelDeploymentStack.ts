@@ -29,11 +29,10 @@ export interface ModelDeploymentStackProps extends StackProps {
         enabled?: boolean;
         minCapacity?: number;
         maxCapacity?: number;
-        invocationsPerInstanceTarget?: number;
-        enableBacklogScaling?: boolean;
         backlogSizePerInstanceTarget?: number;
         scaleOutCooldown?: number;
         scaleInCooldown?: number;
+        maxConcurrentInvocationsPerInstance?: number;
     };
 }
 
@@ -109,41 +108,13 @@ export class ModelDeploymentStack extends Stack {
                 resources: ['*'],
             })
         );
-
-        if (props.inferenceResultsTableArn) {
-            // Use wildcard or construct policy manually for imported tables
-            executionRole.addToPolicy(
-                new iam.PolicyStatement({
-                    effect: iam.Effect.ALLOW,
-                    actions: [
-                        'dynamodb:PutItem',
-                        'dynamodb:UpdateItem',
-                        'dynamodb:GetItem',
-                        'dynamodb:Query',
-                        'dynamodb:Query*',
-                    ],
-                    resources: [props.inferenceResultsTableArn, `${props.inferenceResultsTableArn}/*`],
-                })
-            );
-        } else {
-            // Use direct references if table is owned by this stack
-            executionRole.addToPolicy(
-                new iam.PolicyStatement({
-                    effect: iam.Effect.ALLOW,
-                    actions: [
-                        'dynamodb:PutItem',
-                        'dynamodb:UpdateItem',
-                        'dynamodb:GetItem',
-                        'dynamodb:Query',
-                        'dynamodb:Query*',
-                    ],
-                    resources: [
-                        (inferenceResultTable as dynamodb.Table).tableArn,
-                        `${(inferenceResultTable as dynamodb.Table).tableArn}/*`,
-                    ],
-                })
-            );
-        }
+        executionRole.addToPolicy(
+            new iam.PolicyStatement({
+                effect: iam.Effect.ALLOW,
+                actions: ['s3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:ListBucket'],
+                resources: [inferenceResultsBucket.bucketArn, `${inferenceResultsBucket.bucketArn}/*`],
+            })
+        );
 
         executionRole.applyRemovalPolicy(RemovalPolicy.DESTROY);
 
@@ -237,7 +208,7 @@ export class ModelDeploymentStack extends Stack {
                     },
                 },
                 clientConfig: {
-                    maxConcurrentInvocationsPerInstance: 2,
+                    maxConcurrentInvocationsPerInstance: props.autoScaling?.maxConcurrentInvocationsPerInstance || 2,
                 },
             },
         });
@@ -279,8 +250,8 @@ export class ModelDeploymentStack extends Stack {
                 scalingTarget: scalingTarget,
                 targetValue: autoScalingConfig.backlogSizePerInstanceTarget || 0.5,
                 customMetric: backlogMetric,
-                scaleInCooldown: Duration.seconds(autoScalingConfig.scaleInCooldown || 2400), // 40 minutes - assuming 20-30 minute processing time
-                scaleOutCooldown: Duration.seconds(autoScalingConfig.scaleOutCooldown || 60), // 1 minute - fast response to new requests
+                scaleInCooldown: Duration.seconds(autoScalingConfig.scaleInCooldown || 600), // 10 minutes
+                scaleOutCooldown: Duration.seconds(autoScalingConfig.scaleOutCooldown || 60), // 1 minute
             });
         }
 

@@ -102,8 +102,8 @@ def get_inference(
             # Check if cached results exist
             if 'Items' in response and response['Items']:
                 item = response['Items'][0]
-                existing_version = item.get('modelVersion', None)
-                if existing_version == model_version:
+                existing_version = f"{item.get('modelPackageGroup', "Unknown")}/{item.get('modelVersion', "Unknown")}"
+                if existing_version == f"{model_package_group}/{model_version}":
                     return process_response(item)
 
             # If no cached results, invoke SageMaker endpoint
@@ -112,7 +112,7 @@ def get_inference(
             payload['requestTime'] = datetime.utcnow().isoformat() + 'Z'            
             
             input_bucket, filename = extract_s3_details(data.s3Key)
-            request_s3_url = upload_to_s3(
+            input_s3_url = upload_to_s3(
                 s3_client,
                 inference_results_bucket, 
                 f"input/{input_bucket}/{filename.removesuffix('.dat')}/{request_id}.json", 
@@ -121,7 +121,7 @@ def get_inference(
 
             sm_response = sagemaker_runtime.invoke_endpoint_async(
                 EndpointName=endpoint_name,
-                InputLocation=request_s3_url,
+                InputLocation=input_s3_url,
                 InvocationTimeoutSeconds=3600,
                 InferenceId=inference_id,
                 ContentType="application/json"
@@ -133,8 +133,7 @@ def get_inference(
                 "modelPackageGroup": model_package_group,
                 "modelVersion": model_version,
                 "result": {
-                        "outputS3Url": sm_response["OutputLocation"], 
-                        "failureS3Url": sm_response["FailureLocation"]
+                        "resultS3Url": input_s3_url.replace("input", "result")
                 }
             }            
             update_item_in_dynamodb(
@@ -145,11 +144,11 @@ def get_inference(
             )
 
             response_body = {
+                **update_data,
                 "s3Key": payload["s3Key"],
                 "requestTime": payload["requestTime"],
                 "successTopicArn": success_topic_arn,
-                "failureTopicArn": failure_topic_arn,
-                **update_data
+                "failureTopicArn": failure_topic_arn
             }
             
             return {                
