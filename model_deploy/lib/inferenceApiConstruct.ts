@@ -13,7 +13,7 @@ import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
 import * as path from 'path';
 
-export interface InferencApiConstructProps {
+export interface InferenceApiConstructProps {
     readonly ipCIDRBlocks: string[];
     readonly modelPackageName: string;
     readonly sageMakeEndpointArn: string;
@@ -32,7 +32,7 @@ export interface InferencApiConstructProps {
 export class InferenceApiConstruct extends Construct {
     readonly api: apigateway.RestApi;
 
-    constructor(scope: Construct, id: string, props: InferencApiConstructProps) {
+    constructor(scope: Construct, id: string, props: InferenceApiConstructProps) {
         super(scope, id);
 
         const validationSchema: apigateway.JsonSchema = {

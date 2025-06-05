@@ -122,15 +122,39 @@ export class CodePipelineConstruct extends Construct {
 
         buildProject.addToRolePolicy(
             new iam.PolicyStatement({
-                actions: ['ecr:*'],
+                actions: [
+                    'ecr:GetAuthorizationToken',
+                    'ecr:BatchCheckLayerAvailability',
+                    'ecr:GetDownloadUrlForLayer',
+                    'ecr:BatchGetImage',
+                    'ecr:PutImage',
+                    'ecr:InitiateLayerUpload',
+                    'ecr:UploadLayerPart',
+                    'ecr:CompleteLayerUpload',
+                ],
+                resources: [props.ecrRepo.repositoryArn],
+            })
+        );
+
+        // ECR GetAuthorizationToken requires * resource
+        buildProject.addToRolePolicy(
+            new iam.PolicyStatement({
+                actions: ['ecr:GetAuthorizationToken'],
                 resources: ['*'],
             })
         );
 
         buildProject.addToRolePolicy(
             new iam.PolicyStatement({
-                actions: ['s3:GetObject'],
-                resources: ['*'],
+                actions: ['s3:GetObject', 's3:ListBucket'],
+                resources: [
+                    `${props.dataBucket.bucketArn}/*`,
+                    `${props.dataManifestBucket.bucketArn}/*`,
+                    `${props.sageMakerArtifactBucket.bucketArn}/*`,
+                    props.dataBucket.bucketArn,
+                    props.dataManifestBucket.bucketArn,
+                    props.sageMakerArtifactBucket.bucketArn,
+                ],
             })
         );
 
@@ -324,7 +348,15 @@ export class CodePipelineConstruct extends Construct {
                     },
                 },
                 actions: ['sagemaker:*Endpoint*'],
-                resources: ['*'],
+                resources: [
+                    `arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:endpoint/${
+                        props.projectName
+                    }-*`,
+                    `arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:endpoint-config/${
+                        props.projectName
+                    }-*`,
+                    `arn:aws:sagemaker:${Stack.of(this).region}:${Stack.of(this).account}:model/${props.projectName}-*`,
+                ],
             })
         );
 

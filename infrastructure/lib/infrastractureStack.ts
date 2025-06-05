@@ -6,10 +6,10 @@ import { DataSourceConstruct, DataSourceConstructProps } from './dataSourceConst
 import { EcrConstruct } from './ecrRepositoryConstruct';
 import { SageMakerConstruct } from './sageMakerConstruct';
 
-export type InfrastractureStackProps = CodePipelineConstructPropsBase & StackProps & DataSourceConstructProps;
+export type InfrastructureStackProps = CodePipelineConstructPropsBase & StackProps & DataSourceConstructProps;
 
-export class InfrastractureStack extends Stack {
-    constructor(scope: Construct, id: string, props: InfrastractureStackProps) {
+export class InfrastructureStack extends Stack {
+    constructor(scope: Construct, id: string, props: InfrastructureStackProps) {
         super(scope, id, props);
 
         const projectConfigPath = new CfnParameter(this, 'projectConfigPath', {

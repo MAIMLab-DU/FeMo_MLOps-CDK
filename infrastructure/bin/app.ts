@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: MIT-0
 import { App } from 'aws-cdk-lib';
-import { InfrastractureStack } from '../lib/infrastractureStack';
+import { InfrastructureStack } from '../lib/infrastractureStack';
 import projectConfig = require('../../configuration/projectConfig.json');
 
 const desc: string =
@@ -10,7 +10,7 @@ const desc: string =
     'IAM roles with necessary permissions.';
 
 const app = new App();
-new InfrastractureStack(app, `${projectConfig.projectName}-MLOpsInfraStack`, {
+new InfrastructureStack(app, `${projectConfig.projectName}-MLOpsInfraStack`, {
     projectName: projectConfig.projectName,
     repoType: 'git',
     existingDataBucketName: projectConfig.dataBucketName,
