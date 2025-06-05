@@ -3,8 +3,11 @@ import { Construct } from 'constructs';
 import { Duration, Token } from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as certificatemanager from 'aws-cdk-lib/aws-certificatemanager';
@@ -16,8 +19,11 @@ export interface InferencApiConstructProps {
     readonly sageMakeEndpointArn: string;
     readonly sageMakerEndpointName: string;
     readonly inferenceResultTable: dynamodb.ITable;
+    readonly inferenceResultsBucket: s3.IBucket;
     readonly customDomainName?: string; // Optional custom domain name
     readonly acmCertificateArn?: string; // Optional ACM certificate ARN
+    readonly asyncSuccessTopic: sns.ITopic; // SNS topic for successful async inference
+    readonly asyncErrorTopic: sns.ITopic; // SNS topic for failed async inference
 }
 
 /**
@@ -85,10 +91,25 @@ export class InferenceApiConstruct extends Construct {
         inferenceApiFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
-                Action: ['dynamodb:UpdateItem', 'dynamodb:PutItem', 'dynamodb:GetItem', 'dynamodb:Query*'],
+                Action: [
+                    'dynamodb:UpdateItem',
+                    'dynamodb:PutItem',
+                    'dynamodb:GetItem',
+                    'dynamodb:Query',
+                    'dynamodb:Scan',
+                ],
                 Resource: [props.inferenceResultTable.tableArn, `${props.inferenceResultTable.tableArn}/*`],
             })
         );
+
+        inferenceApiFunctionRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: ['s3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:ListBucket'],
+                Resource: [props.inferenceResultsBucket.bucketArn, `${props.inferenceResultsBucket.bucketArn}/*`],
+            })
+        );
+        props.inferenceResultsBucket.grantReadWrite(inferenceApiFunctionRole);
 
         inferenceApiFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
@@ -110,8 +131,15 @@ export class InferenceApiConstruct extends Construct {
                 MODEL_PACKAGE_NAME: props.modelPackageName,
                 SAGEMAKER_ENDPOINT_NAME: props.sageMakerEndpointName,
                 DYNAMODB_TABLE_NAME: props.inferenceResultTable.tableName,
+                INFERENCE_RESULTS_BUCKET: props.inferenceResultsBucket.bucketName,
+                ASYNC_SUCCESS_TOPIC_ARN: props.asyncSuccessTopic.topicArn,
+                ASYNC_ERROR_TOPIC_ARN: props.asyncErrorTopic.topicArn,
             },
         });
+
+        // Subscribe the Lambda function to SNS topics for async inference notifications
+        props.asyncSuccessTopic.addSubscription(new snsSubscriptions.LambdaSubscription(inferenceApiFunction));
+        props.asyncErrorTopic.addSubscription(new snsSubscriptions.LambdaSubscription(inferenceApiFunction));
 
         const inferenceIntegration = new apigateway.LambdaIntegration(inferenceApiFunction);
 
@@ -190,7 +218,7 @@ export class InferenceApiConstruct extends Construct {
             name: 'InferenceApiUsagePlan',
             apiStages: [{ api: this.api, stage: this.api.deploymentStage }],
             throttle: { burstLimit: 500, rateLimit: 1000 },
-            quota: { limit: 10000000, period: apigateway.Period.MONTH },
+            quota: { limit: 1000000, period: apigateway.Period.MONTH },
         });
 
         // Optional Custom Domain Configuration

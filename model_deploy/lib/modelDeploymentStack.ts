@@ -4,11 +4,15 @@ import { Stack, StackProps, CfnParameter, CustomResource, CfnOutput, Duration, R
 import { InferenceApiConstruct } from './inferenceApiConstruct';
 import * as path from 'path';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as sagemaker from 'aws-cdk-lib/aws-sagemaker';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as customResource from 'aws-cdk-lib/custom-resources';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as applicationautoscaling from 'aws-cdk-lib/aws-applicationautoscaling';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 
 export interface ModelDeploymentStackProps extends StackProps {
     modelEndpointExportNamePrefix: string;
@@ -19,6 +23,17 @@ export interface ModelDeploymentStackProps extends StackProps {
     customDomainName?: string;
     acmCertificateArn?: string;
     inferenceResultsTableArn?: string;
+    inferenceResultsBucketName?: string;
+    // Auto scaling configuration from projectConfig
+    autoScaling?: {
+        enabled?: boolean;
+        minCapacity?: number;
+        maxCapacity?: number;
+        backlogSizePerInstanceTarget?: number;
+        scaleOutCooldown?: number;
+        scaleInCooldown?: number;
+        maxConcurrentInvocationsPerInstance?: number;
+    };
 }
 
 export class ModelDeploymentStack extends Stack {
@@ -32,6 +47,7 @@ export class ModelDeploymentStack extends Stack {
         });
 
         let inferenceResultTable: dynamodb.ITable;
+        let inferenceResultsBucket: s3.IBucket;
 
         if (props.inferenceResultsTableArn) {
             inferenceResultTable = dynamodb.Table.fromTableArn(
@@ -63,6 +79,23 @@ export class ModelDeploymentStack extends Stack {
             default: 'NotTrained',
         });
 
+        // Check if an existing bucket is passed; otherwise, create a new bucket
+        if (props.inferenceResultsBucketName) {
+            inferenceResultsBucket = s3.Bucket.fromBucketName(
+                this,
+                'InferenceResultsBucket',
+                props.inferenceResultsBucketName
+            );
+        } else {
+            inferenceResultsBucket = new s3.Bucket(this, 'InferenceResultsBucket', {
+                blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+                encryption: s3.BucketEncryption.S3_MANAGED,
+                enforceSSL: true,
+                versioned: true,
+                publicReadAccess: false,
+            });
+        }
+
         const executionRole = new iam.Role(this, 'SageMakerModelExecutionRole', {
             assumedBy: new iam.ServicePrincipal('sagemaker.amazonaws.com'),
             managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSageMakerFullAccess')],
@@ -75,43 +108,29 @@ export class ModelDeploymentStack extends Stack {
                 resources: ['*'],
             })
         );
-
-        if (props.inferenceResultsTableArn) {
-            // Use wildcard or construct policy manually for imported tables
-            executionRole.addToPolicy(
-                new iam.PolicyStatement({
-                    effect: iam.Effect.ALLOW,
-                    actions: [
-                        'dynamodb:PutItem',
-                        'dynamodb:UpdateItem',
-                        'dynamodb:GetItem',
-                        'dynamodb:Query',
-                        'dynamodb:Query*',
-                    ],
-                    resources: [props.inferenceResultsTableArn, `${props.inferenceResultsTableArn}/*`],
-                })
-            );
-        } else {
-            // Use direct references if table is owned by this stack
-            executionRole.addToPolicy(
-                new iam.PolicyStatement({
-                    effect: iam.Effect.ALLOW,
-                    actions: [
-                        'dynamodb:PutItem',
-                        'dynamodb:UpdateItem',
-                        'dynamodb:GetItem',
-                        'dynamodb:Query',
-                        'dynamodb:Query*',
-                    ],
-                    resources: [
-                        (inferenceResultTable as dynamodb.Table).tableArn,
-                        `${(inferenceResultTable as dynamodb.Table).tableArn}/*`,
-                    ],
-                })
-            );
-        }
+        executionRole.addToPolicy(
+            new iam.PolicyStatement({
+                effect: iam.Effect.ALLOW,
+                actions: ['s3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:ListBucket'],
+                resources: [inferenceResultsBucket.bucketArn, `${inferenceResultsBucket.bucketArn}/*`],
+            })
+        );
 
         executionRole.applyRemovalPolicy(RemovalPolicy.DESTROY);
+
+        // Create SNS topics for async inference notifications
+        const asyncSuccessTopic = new sns.Topic(this, 'AsyncInferenceSuccessTopic', {
+            topicName: `${props.projectName}-async-inference-success`,
+        });
+
+        const asyncErrorTopic = new sns.Topic(this, 'AsyncInferenceErrorTopic', {
+            topicName: `${props.projectName}-async-inference-error`,
+        });
+
+        // Grant SageMaker permissions for async inference
+        inferenceResultsBucket.grantReadWrite(executionRole);
+        asyncSuccessTopic.grantPublish(executionRole);
+        asyncErrorTopic.grantPublish(executionRole);
 
         const inferenceModelFunctionRole = new iam.Role(this, 'InferenceModelFunctionRole', {
             assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
@@ -163,7 +182,6 @@ export class ModelDeploymentStack extends Stack {
                 modelPackageName: modelPackageName.valueAsString,
                 sagemakerExecutionRole: executionRole.roleArn,
                 projectName: props.projectName,
-                inferenceResultTable: inferenceResultTable.tableName,
             },
         });
 
@@ -175,11 +193,24 @@ export class ModelDeploymentStack extends Stack {
                 {
                     initialInstanceCount: props.endpointInstanceCount || 1,
                     initialVariantWeight: 1.0,
-                    instanceType: props.endpointInstanceType || 'ml.c5.xlarge',
+                    instanceType: props.endpointInstanceType || 'ml.m5.2xlarge',
                     modelName: inferenceModelCustomResource.ref,
                     variantName: 'AllTraffic',
                 },
             ],
+            asyncInferenceConfig: {
+                outputConfig: {
+                    s3OutputPath: `s3://${inferenceResultsBucket.bucketName}/output/`,
+                    s3FailurePath: `s3://${inferenceResultsBucket.bucketName}/failure/`,
+                    notificationConfig: {
+                        successTopic: asyncSuccessTopic.topicArn,
+                        errorTopic: asyncErrorTopic.topicArn,
+                    },
+                },
+                clientConfig: {
+                    maxConcurrentInvocationsPerInstance: props.autoScaling?.maxConcurrentInvocationsPerInstance || 2,
+                },
+            },
         });
 
         endpointConfig.node.addDependency(inferenceModelCustomResource);
@@ -190,14 +221,51 @@ export class ModelDeploymentStack extends Stack {
 
         endpoint.node.addDependency(endpointConfig);
 
+        // Add auto scaling for the endpoint if enabled
+        if (props.autoScaling?.enabled !== false) {
+            const autoScalingConfig = props.autoScaling || {};
+
+            const scalingTarget = new applicationautoscaling.ScalableTarget(this, 'SageMakerEndpointScalingTarget', {
+                serviceNamespace: applicationautoscaling.ServiceNamespace.SAGEMAKER,
+                resourceId: `endpoint/${endpoint.getAtt('EndpointName').toString()}/variant/AllTraffic`,
+                scalableDimension: 'sagemaker:variant:DesiredInstanceCount',
+                minCapacity: autoScalingConfig.minCapacity || 0, // default scale down to zero instance
+                maxCapacity: autoScalingConfig.maxCapacity || 2,
+            });
+
+            scalingTarget.node.addDependency(endpoint);
+
+            // 2. Scale based on approximate backlog size per instance (for async inference)
+            const backlogMetric = new cloudwatch.Metric({
+                namespace: 'AWS/SageMaker',
+                metricName: 'ApproximateBacklogSizePerInstance',
+                dimensionsMap: {
+                    EndpointName: endpoint.getAtt('EndpointName').toString(),
+                },
+                statistic: cloudwatch.Statistic.AVERAGE,
+                period: Duration.minutes(1),
+            });
+
+            new applicationautoscaling.TargetTrackingScalingPolicy(this, 'BacklogScalingPolicy', {
+                scalingTarget: scalingTarget,
+                targetValue: autoScalingConfig.backlogSizePerInstanceTarget || 0.5,
+                customMetric: backlogMetric,
+                scaleInCooldown: Duration.seconds(autoScalingConfig.scaleInCooldown || 600), // 10 minutes
+                scaleOutCooldown: Duration.seconds(autoScalingConfig.scaleOutCooldown || 60), // 1 minute
+            });
+        }
+
         const apiConstruct = new InferenceApiConstruct(this, 'InferenceAPIConstruct', {
             ipCIDRBlocks: props.ipPermitList,
             modelPackageName: modelPackageName.valueAsString,
             sageMakeEndpointArn: endpoint.ref,
             sageMakerEndpointName: endpoint.getAtt('EndpointName').toString(),
             inferenceResultTable: inferenceResultTable,
+            inferenceResultsBucket: inferenceResultsBucket,
             customDomainName: props.customDomainName,
             acmCertificateArn: props.acmCertificateArn,
+            asyncSuccessTopic: asyncSuccessTopic,
+            asyncErrorTopic: asyncErrorTopic,
         });
 
         apiConstruct.node.addDependency(endpoint);
