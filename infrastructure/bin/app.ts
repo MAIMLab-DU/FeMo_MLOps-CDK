@@ -18,5 +18,6 @@ new InfrastractureStack(app, `${projectConfig.projectName}-MLOpsInfraStack`, {
     minNumberOfFiles: projectConfig.minNumberofFiles,
     gitML: projectConfig.gitML,
     gitCDK: projectConfig.gitCDK,
+    notifications: projectConfig.notifications,
     description: desc,
 });

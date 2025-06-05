@@ -6,12 +6,19 @@ import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as sns from 'aws-cdk-lib/aws-sns';
+import * as snsSubscriptions from 'aws-cdk-lib/aws-sns-subscriptions';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as codepipeline from 'aws-cdk-lib/aws-codepipeline';
 import * as codepipeline_actions from 'aws-cdk-lib/aws-codepipeline-actions';
+import * as codestarnotifications from 'aws-cdk-lib/aws-codestarnotifications';
+import * as path from 'path';
 
 export type CodePipelineConstructPropsBase = {
     readonly projectName: string;
+    readonly notifications?: {
+        readonly emails: string[];
+    };
 } & CodePipelineConstructPropsGithubSource;
 
 export type CodePipelineConstructProps = {
@@ -422,6 +429,66 @@ export class CodePipelineConstruct extends Construct {
         this.pipeline.addStage({
             stageName: 'Deploy',
             actions: [manualApprovalAction, deploy],
+        });
+
+        // Add Pipeline State Change Notifications if emails are configured
+        if (props.notifications?.emails && props.notifications.emails.length > 0) {
+            this.addPipelineNotifications(props);
+        }
+    }
+
+    private addPipelineNotifications(props: CodePipelineConstructProps): void {
+        // Create SNS topic for pipeline notifications
+        const pipelineNotificationTopic = new sns.Topic(this, 'PipelineNotificationTopic', {
+            topicName: `${props.projectName}-pipeline-notifications`,
+            displayName: `${props.projectName} Pipeline Notifications`,
+        });
+
+        // Create Lambda function for processing and formatting notifications
+        const notificationHandlerRole = new iam.Role(this, 'NotificationHandlerRole', {
+            assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+            managedPolicies: [iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole')],
+        });
+
+        // Add SES permissions for sending emails
+        notificationHandlerRole.addToPolicy(
+            new iam.PolicyStatement({
+                actions: ['ses:SendEmail', 'ses:SendRawEmail', 'ses:GetSendQuota', 'ses:GetSendStatistics'],
+                resources: ['*'], // SES doesn't support resource-level permissions for these actions
+            })
+        );
+
+        const notificationHandler = new lambda.Function(this, 'PipelineNotificationHandler', {
+            runtime: lambda.Runtime.PYTHON_3_10,
+            handler: 'lambda_function.lambda_handler',
+            code: lambda.Code.fromAsset(path.join(__dirname, '../functions/pipelineNotificationHandler'), {
+                exclude: ['.venv', '.ruff_cache', '.pytest_cache', '*.pyc', '__pycache__'],
+            }),
+            timeout: Duration.minutes(2),
+            role: notificationHandlerRole,
+            environment: {
+                EMAIL_ADDRESSES: props.notifications!.emails.join(','),
+                PROJECT_NAME: props.projectName,
+            },
+        });
+
+        // Subscribe Lambda function to SNS topic
+        pipelineNotificationTopic.addSubscription(new snsSubscriptions.LambdaSubscription(notificationHandler));
+
+        // Create CodeStar notification rule for pipeline state changes
+        new codestarnotifications.NotificationRule(this, 'PipelineStateChangeNotification', {
+            source: this.pipeline,
+            events: [
+                'codepipeline-pipeline-pipeline-execution-started',
+                'codepipeline-pipeline-pipeline-execution-succeeded',
+                'codepipeline-pipeline-pipeline-execution-failed',
+                'codepipeline-pipeline-pipeline-execution-canceled',
+                'codepipeline-pipeline-pipeline-execution-superseded',
+            ],
+            targets: [pipelineNotificationTopic],
+            detailType: codestarnotifications.DetailType.FULL,
+            enabled: true,
+            notificationRuleName: `${props.projectName}-pipeline-notifications`,
         });
     }
 }
