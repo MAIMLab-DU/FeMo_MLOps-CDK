@@ -4,6 +4,7 @@ import os
 import traceback
 from decimal import Decimal
 from datetime import datetime
+from urllib.parse import urlparse
 from boto3.dynamodb.conditions import Key
 from typing import Optional, Literal
 from dataclasses import dataclass, asdict
@@ -27,8 +28,15 @@ sagemaker_runtime = boto3.client('sagemaker-runtime')
 model_package_group = os.getenv('MODEL_PACKAGE_NAME').split('/')[-2]
 model_version = f"Version {os.getenv('MODEL_PACKAGE_NAME').split('/')[-1]}"
 endpoint_name = os.getenv('SAGEMAKER_ENDPOINT_NAME')
+# Initialize DynamoDB resource and table
 dynamodb = boto3.resource('dynamodb', region_name=os.environ['AWS_REGION'])
 table = dynamodb.Table(os.getenv('DYNAMODB_TABLE_NAME'))
+# Initialize S3 resource and bucket name
+s3 = boto3.resource('s3')
+inference_results_bucket = os.getenv('INFERENCE_RESULTS_BUCKET')
+success_topic_arn = os.getenv('ASYNC_SUCCESS_TOPIC_ARN')
+failure_topic_arn = os.getenv('ASYNC_ERROR_TOPIC_ARN')
+
 
 
 def convert_decimals(obj):
@@ -40,6 +48,43 @@ def convert_decimals(obj):
         return float(obj)  # Or int(obj) if appropriate
     else:
         return obj
+
+
+def extract_s3_details(s3_path: str):
+    """Extracts the bucket name and filename from an S3 path."""
+    # Parse the S3 path
+    parsed_url = urlparse(s3_path)
+    bucket_name = parsed_url.netloc
+    filename = parsed_url.path.lstrip('/')
+
+    # Extract the bucket name and the filename
+    if bucket_name == '':
+        raise ValueError(f"Invalid S3 path: {s3_path}")
+    
+    return bucket_name, filename
+
+
+def upload_to_s3(bucket_name, s3_key, data):
+    """
+    Upload data to an S3 bucket.
+
+    Args:
+        bucket_name (str): The name of the S3 bucket.
+        s3_key (str): The S3 key where the data will be stored.
+        data (dict): The data to upload.
+
+    Returns:
+        str: S3 URL of the uploaded object.
+    """
+    try:
+        # Convert data to JSON string
+        json_data = json.dumps(data, indent=2, default=str)
+        s3.Object(bucket_name, s3_key).put(Body=json_data)
+        s3_url = f"s3://{bucket_name}/{s3_key}"
+        return s3_url
+    except Exception as e:
+        print(f"Error uploading to S3: {e}")
+        raise
 
 
 def update_item_in_dynamodb(table, s3_key, time_stamp, update_data):
@@ -110,72 +155,35 @@ def query_table_with_keys(table, s3_key=None, job_id=None, limit=1):
     else:
         raise ValueError("Either 's3Key' or 'jobId' must be provided.")
 
-def process_response(item, status_code=None):
+def process_response(item):
     """
     Process a DynamoDB item response and return formatted response.
 
     Args:
         item: The DynamoDB item to process.
-        data: Input data for additional processing.
-        status_code: HTTP status code (optional).
 
     Returns:
         dict: Formatted HTTP response.
     """
-    status = item.get('status')
-    message_map = {
-        "InProgress": ("Inference job still in progress.", 202),
-        "Completed": ("Inference job completed.", 200)
+    status_map = {
+        "InProgress": 202,
+        "Completed": 200,
+        "Failed": 500,
+        "Unknown": 400
     }
-    message, status_code = message_map.get(status, ("Inference job failed.", 400)) if not status_code else (message_map.get(status)[0], status_code)
     
     body = {
-        "message": message,
+        "jobId": item.get('jobId'),
+        "s3Key": item.get('s3Key'),
+        "requestTime": item.get('timeStamp'),
+        "status": item.get('status', "Unknown"),
         "modelPackageGroup": item.get('modelPackageGroup'),
         "modelVersion": item.get('modelVersion'),
-        "s3Key": item.get('s3Key'),
-        "timeStamp": item.get('timeStamp'),
-        "jobId": item.get('jobId'),
         "result": item.get('result')
     }
-    body = convert_decimals(body)
-
-    def process_result(data: dict) -> dict:
-        """Compute hiccup metrics for given data dictionary."""
-        if data.get('numKicks', 0) == 0:
-            return {
-                "numBoutsPerHour": 0,
-                "meanDurationFM_s": 0,
-                "medianOnsetInterval_s": data.get("medianOnsetInterval_s", 0),
-                "activeTimeFM_%": 0,
-            }
-        
-        total_duration = data["totalFMDuration"] + data["totalNonFMDuration"]
-        
-        return {
-            "numBoutsPerHour": (data["numKicks"] * 60) / total_duration,
-            "meanDurationFM_s": (data["totalFMDuration"] * 60) / data["numKicks"],
-            "medianOnsetInterval_s": data["medianOnsetInterval_s"],
-            "activeTimeFM_%": (data["totalFMDuration"] / total_duration) * 100,
-        }
-
-    if status_code == 200:
-        result = body["result"]
-    
-        # Process pre_hiccup and post_hiccup if available
-        if result.get("pre_hiccup", None) is not None:
-            result["pre_hiccup"] = process_result(result.get("pre_hiccup"))
-        if result.get("post_hiccup", None) is not None:
-            result["post_hiccup"] = process_result(result.get("post_hiccup"))
-
-        # If neither exist, process the main result
-        if result.get("pre_hiccup", None) is None and result.get("post_hiccup", None) is None:
-            result = process_result(result)
-
-        body["result"] = result
     
     return {
-        "statusCode": status_code,
+        "statusCode": status_map.get(item.get('status', "Unknown")),
         "body": json.dumps(body, indent=2)
     }
 
@@ -188,15 +196,6 @@ def get_inference(
 ):
     """
     Processes the inference logic based on the HTTP method.
-
-    Args:
-        request_id: AWS request ID for tracing.
-        method: HTTP method (POST or GET).
-        body: Parsed JSON body for POST requests.
-        query_params: Query parameters for GET requests.
-
-    Returns:
-        dict: Response with statusCode and body.
     """
     if method == "POST":
         if not body:
@@ -204,34 +203,70 @@ def get_inference(
 
         data = RequestData(**body)
         try:
+            # Validate InferenceId length (SageMaker limit: 63 chars)
+            inference_id = request_id
+            if len(inference_id) > 63:
+                # Truncate but keep uniqueness
+                inference_id = inference_id[:63]
+                print(f"Warning: Truncated InferenceId from {len(request_id)} to 63 chars")
+
             # Query the DynamoDB table based on `s3Key`
             response = query_table_with_keys(table, data.s3Key)
-
             # Check if cached results exist
             if 'Items' in response and response['Items']:
                 item = response['Items'][0]
                 existing_version = item.get('modelVersion', None)
                 if existing_version == model_version:
-                    # Re-use cached result if model version matches
                     return process_response(item)
 
             # If no cached results, invoke SageMaker endpoint
             payload = asdict(data)
-            payload['jobId'] = request_id
-            payload['timeStamp'] = datetime.now().isoformat()
-
-            payload_json = json.dumps(payload)
-            sm_response = sagemaker_runtime.invoke_endpoint(
-                EndpointName=endpoint_name,
-                ContentType="application/json",
-                Body=payload_json
+            payload['jobId'] = request_id  # Keep original request_id for DynamoDB
+            payload['requestTime'] = datetime.utcnow().isoformat() + 'Z'            
+            
+            input_bucket, filename = extract_s3_details(data.s3Key)
+            request_s3_url = upload_to_s3(
+                inference_results_bucket, 
+                f"input/{input_bucket}/{filename.removesuffix('.dat')}/{request_id}.json", 
+                payload
             )
-            update_item_in_dynamodb(table, data.s3Key, payload['timeStamp'],
-                                    {"modelVersion": model_version, "modelPackageGroup": model_package_group})
-            result = json.loads(sm_response['Body'].read().decode('utf-8'))
-            return {
-                "statusCode": 200,
-                "body": result
+
+            sm_response = sagemaker_runtime.invoke_endpoint_async(
+                EndpointName=endpoint_name,
+                InputLocation=request_s3_url,
+                InvocationTimeoutSeconds=3600,
+                InferenceId=inference_id,
+                ContentType="application/json"
+            )
+
+            update_data = {
+                "jobId": payload["jobId"],
+                "status": "InProgress",
+                "modelPackageGroup": model_package_group,
+                "modelVersion": model_version,
+                "result": {
+                        "outputS3Url": sm_response["OutputLocation"], 
+                        "failureS3Url": sm_response["FailureLocation"]
+                }
+            }            
+            update_item_in_dynamodb(
+                table, 
+                data.s3Key, 
+                payload['requestTime'],
+                update_data
+            )
+
+            response_body = {
+                "s3Key": payload["s3Key"],
+                "requestTime": payload["requestTime"],
+                "successTopicArn": success_topic_arn,
+                "failureTopicArn": failure_topic_arn,
+                **update_data
+            }
+            
+            return {                
+                "statusCode": sm_response["ResponseMetadata"]["HTTPStatusCode"],
+                "body": response_body
             }
 
         except Exception as e:
@@ -261,7 +296,7 @@ def get_inference(
             }
 
         except Exception as e:
-            print(f"Error invoking SageMaker endpoint: {e}\t{traceback.format_exc()}")
+            print(f"Error getting response for Job ID {job_id}: {e}\t{traceback.format_exc()}")
             return {
                 "statusCode": 500,
                 "body": {"message": str(e)}

@@ -1,5 +1,5 @@
 import json
-from utils import get_inference
+from api_handler import get_inference
 
 # CORS headers
 cors_header = {
