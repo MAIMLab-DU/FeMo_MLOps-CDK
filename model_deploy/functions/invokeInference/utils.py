@@ -16,36 +16,79 @@ def convert_decimals(obj):
 
 
 def extract_s3_details(s3_path: str):
-    """Extracts the bucket name and filename from an S3 path."""
-    # Parse the S3 path
-    parsed_url = urlparse(s3_path)
-    bucket_name = parsed_url.netloc
-    filename = parsed_url.path.lstrip('/')
-
-    # Extract the bucket name and the filename
-    if bucket_name == '':
-        raise ValueError(f"Invalid S3 path: {s3_path}")
-    
-    return bucket_name, filename
-
-
-def upload_to_s3(s3_client, bucket_name, s3_key, data):
     """
-    Upload data to an S3 bucket.
+    Extracts the bucket name and key (filename) from an S3 path.
+    Args:
+        s3_path (str): The S3 path (e.g., 's3://bucket/key' or 'bucket/key').
+    Returns:
+        tuple: (bucket_name, key)
+    Raises:
+        ValueError: If the S3 path is invalid.
+    """
+    if not isinstance(s3_path, str) or not s3_path.strip():
+        raise ValueError("S3 path must be a non-empty string.")
+
+    # Handle both 's3://bucket/key' and 'bucket/key'
+    if s3_path.startswith("s3://"):
+        parsed_url = urlparse(s3_path)
+        bucket_name = parsed_url.netloc
+        key = parsed_url.path.lstrip('/')
+    else:
+        # Assume format 'bucket/key'
+        parts = s3_path.split('/', 1)
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            raise ValueError(f"Invalid S3 path format: {s3_path}")
+        bucket_name, key = parts
+
+    if not bucket_name or not key:
+        raise ValueError(f"Invalid S3 path: {s3_path} (bucket or key missing)")
+
+    return bucket_name, key
+
+
+def download_json_from_s3(s3_client, bucket_name, key) -> dict:
+    """
+    Downloads a file from an S3 bucket and parses its content as JSON.
+    Args:
+        s3_client (boto3.client): The boto3 S3 client used to interact with AWS S3.
+        bucket_name (str): The name of the S3 bucket.
+        key (str): The key (path) of the file in the S3 bucket.
+    Returns:
+        dict: The parsed JSON content of the downloaded file.
+    Raises:
+        Exception: If there is an error during the download or parsing process.
+    """
+    try:        
+        # Download file from S3
+        response = s3_client.get_object(Bucket=bucket_name, Key=key)
+        content = response['Body'].read().decode('utf-8')        
+        # Parse JSON content
+        return json.loads(content)
+        
+    except Exception as e:
+        print(f"Error downloading from S3: {e}")
+        raise
+
+
+def upload_json_to_s3(s3_client, bucket_name, key, data):
+    """
+    Uploads data to an S3 bucket as a JSON file.
 
     Args:
+        s3_client (boto3.resource): The S3 resource client.
         bucket_name (str): The name of the S3 bucket.
-        s3_key (str): The S3 key where the data will be stored.
-        data (dict): The data to upload.
-
+        s3_key (str): The S3 object key (path/filename).
+        data (Any): The data to be uploaded, which will be serialized to JSON.
     Returns:
-        str: S3 URL of the uploaded object.
+        str: The S3 URL of the uploaded object.
+    Raises:
+        Exception: If there is an error during upload.
     """
     try:
         # Convert data to JSON string
         json_data = json.dumps(data, indent=2, default=str)
-        s3_client.Object(bucket_name, s3_key).put(Body=json_data)
-        s3_url = f"s3://{bucket_name}/{s3_key}"
+        s3_client.put_object(Bucket=bucket_name, Key=key, Body=json_data)
+        s3_url = f"s3://{bucket_name}/{key}"
         return s3_url
     except Exception as e:
         print(f"Error uploading to S3: {e}")

@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional, Literal
 from dataclasses import dataclass, asdict
 from utils import (
-    upload_to_s3,
+    upload_json_to_s3,
     extract_s3_details,
     update_item_in_dynamodb,
     query_table_with_keys
@@ -35,7 +35,7 @@ endpoint_name = os.getenv('SAGEMAKER_ENDPOINT_NAME')
 dynamodb = boto3.resource('dynamodb', region_name=os.environ['AWS_REGION'])
 table = dynamodb.Table(os.getenv('DYNAMODB_TABLE_NAME'))
 # Initialize S3 resource and bucket name
-s3_client = boto3.resource('s3')
+s3_client = boto3.client('s3')
 inference_results_bucket = os.getenv('INFERENCE_RESULTS_BUCKET')
 success_topic_arn = os.getenv('ASYNC_SUCCESS_TOPIC_ARN')
 failure_topic_arn = os.getenv('ASYNC_ERROR_TOPIC_ARN')
@@ -111,12 +111,14 @@ def get_inference(
             payload['jobId'] = request_id  # Keep original request_id for DynamoDB
             payload['requestTime'] = datetime.utcnow().isoformat() + 'Z'            
             
+            # Upload input data for Sagemaker request
             input_bucket, filename = extract_s3_details(data.s3Key)
-            input_s3_url = upload_to_s3(
-                s3_client,
-                inference_results_bucket, 
-                f"input/{input_bucket}/{filename.removesuffix('.dat')}/{request_id}.json", 
-                payload
+            input_s3_key = f"input/{input_bucket}/{filename.removesuffix('.dat')}/{request_id}.json"
+            input_s3_url = upload_json_to_s3(
+                s3_client=s3_client,
+                bucket_name=inference_results_bucket,
+                key=input_s3_key,
+                data=payload
             )
 
             sm_response = sagemaker_runtime.invoke_endpoint_async(

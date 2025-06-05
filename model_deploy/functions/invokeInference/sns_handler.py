@@ -5,7 +5,8 @@ from datetime import datetime
 from typing import Dict, Any
 from utils import (
     extract_s3_details,
-    upload_to_s3,
+    upload_json_to_s3,
+    download_json_from_s3,
     query_table_with_keys,
     update_item_in_dynamodb
 )
@@ -75,19 +76,30 @@ def process_success_notification(sns_message: Dict[str, Any], inference_id: str)
             raise ValueError("No output location found in success notification")
         
         # Download and process output from S3
-        result_data = download_inference_results(output_location)
+        output_bucket_name, output_s3_key = extract_s3_details(output_location)
+        print(f"Downloading output from S3 bucket: {output_bucket_name}, key: {output_s3_key}")
+        result_data = download_json_from_s3(
+            s3_client=s3_client,
+            bucket_name=output_bucket_name,
+            key=output_s3_key
+        )
+
         result_data["modelPackageGroup"] = model_package_group
         result_data["modelVersion"] = model_version
         result_data["completionTime"] = invocation_end_time
 
-        result_s3_url = upload_to_s3(
-                s3_client,
-                inference_results_bucket, 
-                input_location.replace("input", "result"), 
-                result_data
-            )
+        _, input_s3_key = extract_s3_details(input_location)
+        result_s3_key = input_s3_key.replace("input", "result")
+        print(f"Uploading result to S3 bucket: {inference_results_bucket}, key: {result_s3_key}")
+        result_s3_url = upload_json_to_s3(
+            s3_client=s3_client,
+            bucket_name=inference_results_bucket,
+            key=result_s3_key,
+            data=result_data
+        )
         
         # Update DynamoDB with results
+        print(f"Updating DynamoDB for Completed inference ID: {inference_id}")
         update_result = update_inference_status(
             inference_id=inference_id,
             status="Completed",
@@ -118,6 +130,7 @@ def process_error_notification(sns_message: Dict[str, Any], inference_id: str) -
         invocation_end_time = sns_message.get("eventTime")
                 
         # Update DynamoDB with error status
+        print(f"Updating DynamoDB for Failed inference ID: {inference_id}")
         update_result = update_inference_status(
             inference_id=inference_id,
             status="Failed",
@@ -136,26 +149,6 @@ def process_error_notification(sns_message: Dict[str, Any], inference_id: str) -
         
     except Exception as e:
         print(f"Error processing error notification: {e}")
-        raise
-
-
-def download_inference_results(s3_url: str) -> Dict[str, Any]:
-    """Download inference results from S3."""
-    try:
-        # Parse S3 URL
-        bucket_name, key = extract_s3_details(s3_url)
-        
-        print(f"Downloading results from s3://{bucket_name}/{key}")
-        
-        # Download file from S3
-        response = s3_client.get_object(Bucket=bucket_name, Key=key)
-        content = response['Body'].read().decode('utf-8')
-        
-        # Parse JSON content
-        return json.loads(content)
-        
-    except Exception as e:
-        print(f"Error downloading inference results: {e}")
         raise
 
 
