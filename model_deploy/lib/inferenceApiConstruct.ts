@@ -95,8 +95,8 @@ export class InferenceApiConstruct extends Construct {
                     'dynamodb:UpdateItem',
                     'dynamodb:PutItem',
                     'dynamodb:GetItem',
-                    'dynamodb:Query*',
-                    'dynamodb:Scan*',
+                    'dynamodb:Query',
+                    'dynamodb:Scan',
                 ],
                 Resource: [props.inferenceResultTable.tableArn, `${props.inferenceResultTable.tableArn}/*`],
             })

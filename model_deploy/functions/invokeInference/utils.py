@@ -97,6 +97,7 @@ def upload_json_to_s3(s3_client, bucket_name, key, data):
     """
     try:
         # Convert data to JSON string
+        data = convert_decimals(data)
         json_data = json.dumps(data, indent=2, default=str)
         s3_client.put_object(Bucket=bucket_name, Key=key, Body=json_data)
         s3_url = f"s3://{bucket_name}/{key}"

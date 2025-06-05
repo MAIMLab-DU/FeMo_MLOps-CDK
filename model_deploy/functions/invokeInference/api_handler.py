@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Optional, Literal
 from dataclasses import dataclass, asdict
 from utils import (
+    convert_decimals,
     upload_json_to_s3,
     extract_s3_details,
     update_item_in_dynamodb,
@@ -66,10 +67,11 @@ def process_response(item):
         "modelVersion": item.get('modelVersion'),
         "result": item.get('result')
     }
+    body = convert_decimals(body)
     
     return {
-        "statusCode": status_map.get(item.get('status', "Unknown")),
-        "body": json.dumps(body, indent=2)
+        "statusCode": status_map.get(item.get('status', "Unknown"), 400),
+        "body": json.dumps(body, indent=2, default=str)
     }
 
 
@@ -133,7 +135,7 @@ def get_inference(
                 "modelPackageGroup": MODEL_PACKAGE_GROUP,
                 "modelVersion": MODEL_VERSION,
                 "result": {
-                        "resultS3Url": input_s3_url.replace("input", "result")
+                        "resultS3Url": input_s3_url.replace("/input/", "/result/", 1)
                 }
             }            
             update_item_in_dynamodb(
