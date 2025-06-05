@@ -13,6 +13,7 @@ from utils import (
     query_table_with_keys,
     MODEL_PACKAGE_GROUP,
     MODEL_VERSION,
+    GIT_COMMIT_ID,
     RESULTS_BUCKET,
     TABLE_NAME,
     SM_ENDPOINT_NAME,
@@ -65,6 +66,7 @@ def process_response(item):
         "status": item.get('status', "Unknown"),
         "modelPackageGroup": item.get('modelPackageGroup'),
         "modelVersion": item.get('modelVersion'),
+        "gitCommitIdMLCode": item.get('gitCommitIdMLCode'),
         "result": item.get('result')
     }
     body = convert_decimals(body)
@@ -134,6 +136,7 @@ def get_inference(
                 "status": "InProgress",
                 "modelPackageGroup": MODEL_PACKAGE_GROUP,
                 "modelVersion": MODEL_VERSION,
+                "gitCommitIdMLCode": GIT_COMMIT_ID,
                 "result": {
                         "resultS3Url": input_s3_url.replace("/input/", "/result/", 1)
                 }

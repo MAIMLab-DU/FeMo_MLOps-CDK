@@ -1,6 +1,7 @@
 import json
 from utils import (
     MODEL_PACKAGE_NAME,
+    GIT_COMMIT_ID,
     TABLE_NAME,
     RESULTS_BUCKET,
     SUCCESS_TOPIC_ARN,
@@ -10,6 +11,8 @@ from utils import (
 
 if not MODEL_PACKAGE_NAME or '/' not in MODEL_PACKAGE_NAME:
     raise ValueError("Environment variable 'MODEL_PACKAGE_NAME' must be set and contain at least one '/'.")
+if not GIT_COMMIT_ID:
+    raise ValueError("Environment variable 'GIT_COMMIT_ID' must be set.")
 if not TABLE_NAME:
     raise ValueError("Environment variable 'DYNAMODB_TABLE_NAME' must be set.")
 if not RESULTS_BUCKET:

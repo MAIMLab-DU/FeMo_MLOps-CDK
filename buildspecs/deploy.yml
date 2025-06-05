@@ -13,8 +13,9 @@ phases:
 
   build:
     commands:
+      - pipeline_name=$(echo $CODEBUILD_INITIATOR | cut -c14-)
       - bash scripts/build_deploy.sh -c "$CONFIG_S3_PATH"
-      - bash scripts/deploy.sh
+      - bash scripts/deploy.sh -n "$pipeline_name" --codebuild
 
 artifacts:
   files:

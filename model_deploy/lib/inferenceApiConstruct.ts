@@ -16,6 +16,7 @@ import * as path from 'path';
 export interface InferencApiConstructProps {
     readonly ipCIDRBlocks: string[];
     readonly modelPackageName: string;
+    readonly gitCommitId: string;
     readonly sageMakeEndpointArn: string;
     readonly sageMakerEndpointName: string;
     readonly inferenceResultTable: dynamodb.ITable;
@@ -129,6 +130,7 @@ export class InferenceApiConstruct extends Construct {
             role: inferenceApiFunctionRole,
             environment: {
                 MODEL_PACKAGE_NAME: props.modelPackageName,
+                GIT_COMMIT_ID: props.gitCommitId,
                 SAGEMAKER_ENDPOINT_NAME: props.sageMakerEndpointName,
                 DYNAMODB_TABLE_NAME: props.inferenceResultTable.tableName,
                 INFERENCE_RESULTS_BUCKET: props.inferenceResultsBucket.bucketName,

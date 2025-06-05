@@ -13,6 +13,7 @@ from utils import (
     RESULTS_BUCKET,
     MODEL_PACKAGE_GROUP,
     MODEL_VERSION,
+    GIT_COMMIT_ID
 )
 
 # Initialize DynamoDB and S3
@@ -82,6 +83,7 @@ def process_success_notification(sns_message: Dict[str, Any], inference_id: str)
 
         result_data["modelPackageGroup"] = MODEL_PACKAGE_GROUP
         result_data["modelVersion"] = MODEL_VERSION
+        result_data["gitCommitIdMLCode"] = GIT_COMMIT_ID
         result_data["completionTime"] = invocation_end_time
 
         _, input_s3_key = extract_s3_details(input_location)

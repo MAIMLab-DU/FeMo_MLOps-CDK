@@ -78,6 +78,10 @@ export class ModelDeploymentStack extends Stack {
             type: 'String',
             default: 'NotTrained',
         });
+        const gitCommitId = new CfnParameter(this, 'gitCommitId', {
+            type: 'String',
+            default: 'Unknown',
+        });
 
         // Check if an existing bucket is passed; otherwise, create a new bucket
         if (props.inferenceResultsBucketName) {
@@ -258,6 +262,7 @@ export class ModelDeploymentStack extends Stack {
         const apiConstruct = new InferenceApiConstruct(this, 'InferenceAPIConstruct', {
             ipCIDRBlocks: props.ipPermitList,
             modelPackageName: modelPackageName.valueAsString,
+            gitCommitId: gitCommitId.valueAsString,
             sageMakeEndpointArn: endpoint.ref,
             sageMakerEndpointName: endpoint.getAtt('EndpointName').toString(),
             inferenceResultTable: inferenceResultTable,
