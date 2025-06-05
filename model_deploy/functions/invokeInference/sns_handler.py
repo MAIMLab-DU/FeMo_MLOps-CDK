@@ -1,5 +1,5 @@
-import json
 import os
+import json
 import boto3
 from datetime import datetime
 from typing import Dict, Any
@@ -8,21 +8,17 @@ from utils import (
     upload_json_to_s3,
     download_json_from_s3,
     query_table_with_keys,
-    update_item_in_dynamodb
+    update_item_in_dynamodb,
+    TABLE_NAME,
+    RESULTS_BUCKET,
+    MODEL_PACKAGE_GROUP,
+    MODEL_VERSION,
 )
 
-# Initialize AWS clients
-dynamodb = boto3.resource('dynamodb')
+# Initialize DynamoDB and S3
 s3_client = boto3.client('s3')
-
-# Environment variables
-model_package_group = os.getenv('MODEL_PACKAGE_NAME').split('/')[-2]
-model_version = f"Version {os.getenv('MODEL_PACKAGE_NAME').split('/')[-1]}"
-table_name = os.environ.get('DYNAMODB_TABLE_NAME')
-inference_results_bucket = os.environ.get('INFERENCE_RESULTS_BUCKET')
-
-# Initialize DynamoDB table
-table = dynamodb.Table(table_name) if table_name else None
+dynamodb = boto3.resource('dynamodb', region_name=os.environ['AWS_REGION'])
+table = dynamodb.Table(TABLE_NAME)
 
 
 def process_sns_notification(sns_message: Dict[str, Any], topic_arn: str, message_id: str) -> Dict[str, Any]:
@@ -84,16 +80,16 @@ def process_success_notification(sns_message: Dict[str, Any], inference_id: str)
             key=output_s3_key
         )
 
-        result_data["modelPackageGroup"] = model_package_group
-        result_data["modelVersion"] = model_version
+        result_data["modelPackageGroup"] = MODEL_PACKAGE_GROUP
+        result_data["modelVersion"] = MODEL_VERSION
         result_data["completionTime"] = invocation_end_time
 
         _, input_s3_key = extract_s3_details(input_location)
         result_s3_key = input_s3_key.replace("input", "result")
-        print(f"Uploading result to S3 bucket: {inference_results_bucket}, key: {result_s3_key}")
+        print(f"Uploading result to S3 bucket: {RESULTS_BUCKET}, key: {result_s3_key}")
         result_s3_url = upload_json_to_s3(
             s3_client=s3_client,
-            bucket_name=inference_results_bucket,
+            bucket_name=RESULTS_BUCKET,
             key=result_s3_key,
             data=result_data
         )

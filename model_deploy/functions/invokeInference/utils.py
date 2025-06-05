@@ -1,7 +1,18 @@
+import os
 import json
 from decimal import Decimal
 from urllib.parse import urlparse
 from boto3.dynamodb.conditions import Key
+
+# Environment variables
+MODEL_PACKAGE_NAME = os.getenv('MODEL_PACKAGE_NAME')
+MODEL_PACKAGE_GROUP = MODEL_PACKAGE_NAME.split('/')[-2]
+MODEL_VERSION = f"Version {MODEL_PACKAGE_NAME.split('/')[-1]}"
+TABLE_NAME = os.getenv('DYNAMODB_TABLE_NAME')
+RESULTS_BUCKET = os.getenv('INFERENCE_RESULTS_BUCKET')
+SUCCESS_TOPIC_ARN = os.getenv('ASYNC_SUCCESS_TOPIC_ARN')
+FAILURE_TOPIC_ARN = os.getenv('ASYNC_ERROR_TOPIC_ARN')
+SM_ENDPOINT_NAME = os.getenv('SAGEMAKER_ENDPOINT_NAME')
 
 
 def convert_decimals(obj):

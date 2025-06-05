@@ -1,6 +1,25 @@
 import json
-from api_handler import get_inference
-from sns_handler import process_sns_notification
+from utils import (
+    MODEL_PACKAGE_NAME,
+    TABLE_NAME,
+    RESULTS_BUCKET,
+    SUCCESS_TOPIC_ARN,
+    FAILURE_TOPIC_ARN,
+    SM_ENDPOINT_NAME
+)
+
+if not MODEL_PACKAGE_NAME or '/' not in MODEL_PACKAGE_NAME:
+    raise ValueError("Environment variable 'MODEL_PACKAGE_NAME' must be set and contain at least one '/'.")
+if not TABLE_NAME:
+    raise ValueError("Environment variable 'DYNAMODB_TABLE_NAME' must be set.")
+if not RESULTS_BUCKET:
+    raise ValueError("Environment variable 'INFERENCE_RESULTS_BUCKET' must be set.")
+if not SUCCESS_TOPIC_ARN:
+    raise ValueError("Environment variable 'SUCCESS_TOPIC_ARN' must be set.")
+if not FAILURE_TOPIC_ARN:
+    raise ValueError("Environment variable 'FAILURE_TOPIC_ARN' must be set.")
+if not SM_ENDPOINT_NAME:
+    raise ValueError("Environment variable 'SAGEMAKER_ENDPOINT_NAME' must be set.")
 
 # CORS headers
 cors_header = {
@@ -63,7 +82,9 @@ def is_api_gateway_event(event):
 def handle_sns_event(event, context):
     """Handle SNS notification events (async inference completion)."""
     print("Processing SNS event")
-    try:
+    try:        
+        from sns_handler import process_sns_notification
+
         results = []
         for record in event["Records"]:
             if record["EventSource"] == "aws:sns":
@@ -89,7 +110,8 @@ def handle_sns_event(event, context):
 
 def handle_api_gateway_event(event, context):
     """Handle API Gateway HTTP requests."""
-    print("Processing API Gateway event")
+    print("Processing API Gateway event")    
+    from api_handler import get_inference
     
     method = event.get("httpMethod")
     if not method:

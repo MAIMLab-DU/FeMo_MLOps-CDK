@@ -1,6 +1,6 @@
+import os
 import boto3
 import json
-import os
 import traceback
 from datetime import datetime
 from typing import Optional, Literal
@@ -9,7 +9,14 @@ from utils import (
     upload_json_to_s3,
     extract_s3_details,
     update_item_in_dynamodb,
-    query_table_with_keys
+    query_table_with_keys,
+    MODEL_PACKAGE_GROUP,
+    MODEL_VERSION,
+    RESULTS_BUCKET,
+    TABLE_NAME,
+    SM_ENDPOINT_NAME,
+    SUCCESS_TOPIC_ARN,
+    FAILURE_TOPIC_ARN
 )
 
 @dataclass
@@ -26,19 +33,10 @@ class RequestData:
 
 
 # Initialize SageMaker runtime client
-sagemaker_runtime = boto3.client('sagemaker-runtime')
-# Retrieve endpoint name from environment variables
-model_package_group = os.getenv('MODEL_PACKAGE_NAME').split('/')[-2]
-model_version = f"Version {os.getenv('MODEL_PACKAGE_NAME').split('/')[-1]}"
-endpoint_name = os.getenv('SAGEMAKER_ENDPOINT_NAME')
-# Initialize DynamoDB resource and table
-dynamodb = boto3.resource('dynamodb', region_name=os.environ['AWS_REGION'])
-table = dynamodb.Table(os.getenv('DYNAMODB_TABLE_NAME'))
-# Initialize S3 resource and bucket name
 s3_client = boto3.client('s3')
-inference_results_bucket = os.getenv('INFERENCE_RESULTS_BUCKET')
-success_topic_arn = os.getenv('ASYNC_SUCCESS_TOPIC_ARN')
-failure_topic_arn = os.getenv('ASYNC_ERROR_TOPIC_ARN')
+sagemaker_runtime = boto3.client('sagemaker-runtime')
+dynamodb = boto3.resource('dynamodb', region_name=os.environ['AWS_REGION'])
+table = dynamodb.Table(TABLE_NAME)
 
 
 def process_response(item):
@@ -103,7 +101,7 @@ def get_inference(
             if 'Items' in response and response['Items']:
                 item = response['Items'][0]
                 existing_version = f"{item.get('modelPackageGroup', "Unknown")}/{item.get('modelVersion', "Unknown")}"
-                if existing_version == f"{model_package_group}/{model_version}":
+                if existing_version == f"{MODEL_PACKAGE_GROUP}/{MODEL_VERSION}":
                     return process_response(item)
 
             # If no cached results, invoke SageMaker endpoint
@@ -116,13 +114,13 @@ def get_inference(
             input_s3_key = f"input/{input_bucket}/{filename.removesuffix('.dat')}/{request_id}.json"
             input_s3_url = upload_json_to_s3(
                 s3_client=s3_client,
-                bucket_name=inference_results_bucket,
+                bucket_name=RESULTS_BUCKET,
                 key=input_s3_key,
                 data=payload
             )
 
             sm_response = sagemaker_runtime.invoke_endpoint_async(
-                EndpointName=endpoint_name,
+                EndpointName=SM_ENDPOINT_NAME,
                 InputLocation=input_s3_url,
                 InvocationTimeoutSeconds=3600,
                 InferenceId=inference_id,
@@ -132,8 +130,8 @@ def get_inference(
             update_data = {
                 "jobId": payload["jobId"],
                 "status": "InProgress",
-                "modelPackageGroup": model_package_group,
-                "modelVersion": model_version,
+                "modelPackageGroup": MODEL_PACKAGE_GROUP,
+                "modelVersion": MODEL_VERSION,
                 "result": {
                         "resultS3Url": input_s3_url.replace("input", "result")
                 }
@@ -149,8 +147,8 @@ def get_inference(
                 **update_data,
                 "s3Key": payload["s3Key"],
                 "requestTime": payload["requestTime"],
-                "successTopicArn": success_topic_arn,
-                "failureTopicArn": failure_topic_arn
+                "successTopicArn": SUCCESS_TOPIC_ARN,
+                "failureTopicArn": FAILURE_TOPIC_ARN
             }
             
             return {                
