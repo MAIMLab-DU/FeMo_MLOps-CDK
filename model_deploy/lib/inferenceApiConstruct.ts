@@ -115,7 +115,7 @@ export class InferenceApiConstruct extends Construct {
         inferenceApiFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
-                Action: ['sagemaker:InvokeEndpoint', 'sagemaker:DescribeEndpoint'],
+                Action: ['sagemaker:InvokeEndpoint', 'sagemaker:InvokeEndpointAsync', 'sagemaker:DescribeEndpoint'],
                 Resource: [props.sageMakeEndpointArn],
             })
         );
