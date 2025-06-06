@@ -77,10 +77,10 @@ jobs:
         run: |
           projectName=$(cat ./configuration/projectConfig.json | jq -r ".projectName")
           if [[ "${{ github.ref_name }}" == "dev" ]]; then
-            bash scripts/deploy.sh -c "${projectName}-MLOpsInfraStack-*" -p "${{ secrets.DEV_AWS_PROFILE }}"
+            bash scripts/deploy.sh -n "${projectName}-MLOpsInfraStack-*" -p "${{ secrets.DEV_AWS_PROFILE }}"
 
           elif [[ "${{ github.ref_name }}" == "main" ]]; then
-            bash scripts/deploy.sh -c "${projectName}-MLOpsInfraStack-*" -p "${{ secrets.PROD_AWS_PROFILE }}"
+            bash scripts/deploy.sh -n "${projectName}-MLOpsInfraStack-*" -p "${{ secrets.PROD_AWS_PROFILE }}"
 
           else
             echo "Unsupported branch: ${{ github.ref_name }}"
