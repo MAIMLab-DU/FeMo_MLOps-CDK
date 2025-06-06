@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT-0
 import { Construct } from 'constructs';
-import { Duration, Token } from 'aws-cdk-lib';
+import { Duration } from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
@@ -232,8 +232,6 @@ export class InferenceApiConstruct extends Construct {
                 },
             ],
         });
-
-        this.api.latestDeployment?.addToLogicalId(Token.asAny(apigatewayPolicy));
 
         this.api.addUsagePlan('InferenceApiUsagePlan', {
             name: 'InferenceApiUsagePlan',
