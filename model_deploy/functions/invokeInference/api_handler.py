@@ -119,6 +119,8 @@ def get_endpoint_status():
             "modelPackageGroup": MODEL_PACKAGE_GROUP,
             "modelVersion": MODEL_VERSION,
             "gitCommitIdMLCode": GIT_COMMIT_ID,
+            "successTopicArn": SUCCESS_TOPIC_ARN,
+            "failureTopicArn": FAILURE_TOPIC_ARN,
             "warnings": warnings if warnings else None
         }
         
@@ -213,9 +215,7 @@ def get_inference(
             response_body = {
                 **update_data,
                 "s3Key": payload["s3Key"],
-                "requestTime": payload["requestTime"],
-                "successTopicArn": SUCCESS_TOPIC_ARN,
-                "failureTopicArn": FAILURE_TOPIC_ARN
+                "requestTime": payload["requestTime"]
             }
             
             return {                

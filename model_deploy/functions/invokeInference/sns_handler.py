@@ -87,7 +87,7 @@ def process_success_notification(sns_message: Dict[str, Any], inference_id: str)
         result_data["completionTime"] = invocation_end_time
 
         _, input_s3_key = extract_s3_details(input_location)
-        result_s3_key = input_s3_key.replace("/input/", "/result/", 1)
+        result_s3_key = input_s3_key.replace("input/", "result/", 1)
         print(f"Uploading result to S3 bucket: {RESULTS_BUCKET}, key: {result_s3_key}")
         result_s3_url = upload_json_to_s3(
             s3_client=s3_client,
