@@ -120,6 +120,14 @@ export class InferenceApiConstruct extends Construct {
             })
         );
 
+        inferenceApiFunctionRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: ['sns:Publish'],
+                Resource: [props.asyncSuccessTopic.topicArn, props.asyncErrorTopic.topicArn],
+            })
+        );
+
         const inferenceApiFunction = new lambda.Function(this, 'InferenceApiFunction', {
             runtime: lambda.Runtime.PYTHON_3_10, // Use Python 3.10 runtime
             handler: 'lambda_function.lambda_handler', // Python handler defined as 'filename.function_name'
