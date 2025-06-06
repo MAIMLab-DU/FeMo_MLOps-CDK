@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT-0
 import { Construct } from 'constructs';
-import { Duration, Token } from 'aws-cdk-lib';
+import { Duration } from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as s3 from 'aws-cdk-lib/aws-s3';
@@ -16,6 +16,7 @@ import * as path from 'path';
 export interface InferencApiConstructProps {
     readonly ipCIDRBlocks: string[];
     readonly modelPackageName: string;
+    readonly gitCommitId: string;
     readonly sageMakeEndpointArn: string;
     readonly sageMakerEndpointName: string;
     readonly inferenceResultTable: dynamodb.ITable;
@@ -114,7 +115,7 @@ export class InferenceApiConstruct extends Construct {
         inferenceApiFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
-                Action: ['sagemaker:InvokeEndpoint'],
+                Action: ['sagemaker:InvokeEndpoint', 'sagemaker:DescribeEndpoint'],
                 Resource: [props.sageMakeEndpointArn],
             })
         );
@@ -129,6 +130,7 @@ export class InferenceApiConstruct extends Construct {
             role: inferenceApiFunctionRole,
             environment: {
                 MODEL_PACKAGE_NAME: props.modelPackageName,
+                GIT_COMMIT_ID: props.gitCommitId,
                 SAGEMAKER_ENDPOINT_NAME: props.sageMakerEndpointName,
                 DYNAMODB_TABLE_NAME: props.inferenceResultTable.tableName,
                 INFERENCE_RESULTS_BUCKET: props.inferenceResultsBucket.bucketName,
@@ -212,7 +214,24 @@ export class InferenceApiConstruct extends Construct {
             ],
         });
 
-        this.api.latestDeployment?.addToLogicalId(Token.asAny(apigatewayPolicy));
+        // Add /status endpoint for monitoring endpoint health
+        const statusEndpoint = this.api.root.addResource('status');
+        statusEndpoint.addMethod('GET', inferenceIntegration, {
+            methodResponses: [
+                {
+                    statusCode: '200',
+                    responseModels: {
+                        'application/json': apigateway.Model.EMPTY_MODEL,
+                    },
+                },
+                {
+                    statusCode: '500',
+                    responseModels: {
+                        'application/json': apigateway.Model.ERROR_MODEL,
+                    },
+                },
+            ],
+        });
 
         this.api.addUsagePlan('InferenceApiUsagePlan', {
             name: 'InferenceApiUsagePlan',

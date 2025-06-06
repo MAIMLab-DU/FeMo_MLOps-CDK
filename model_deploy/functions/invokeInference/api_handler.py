@@ -13,6 +13,7 @@ from utils import (
     query_table_with_keys,
     MODEL_PACKAGE_GROUP,
     MODEL_VERSION,
+    GIT_COMMIT_ID,
     RESULTS_BUCKET,
     TABLE_NAME,
     SM_ENDPOINT_NAME,
@@ -33,9 +34,10 @@ class RequestData:
             raise ValueError(f"'s3Key' must be a string, got {type(self.s3Key).__name__}")
 
 
-# Initialize SageMaker runtime client
+# Initialize SageMaker runtime client and SageMaker client
 s3_client = boto3.client('s3')
 sagemaker_runtime = boto3.client('sagemaker-runtime')
+sagemaker_client = boto3.client('sagemaker')
 dynamodb = boto3.resource('dynamodb', region_name=os.environ['AWS_REGION'])
 table = dynamodb.Table(TABLE_NAME)
 
@@ -65,6 +67,7 @@ def process_response(item):
         "status": item.get('status', "Unknown"),
         "modelPackageGroup": item.get('modelPackageGroup'),
         "modelVersion": item.get('modelVersion'),
+        "gitCommitIdMLCode": item.get('gitCommitIdMLCode'),
         "result": item.get('result')
     }
     body = convert_decimals(body)
@@ -73,6 +76,67 @@ def process_response(item):
         "statusCode": status_map.get(item.get('status', "Unknown"), 400),
         "body": json.dumps(body, indent=2, default=str)
     }
+
+
+def get_endpoint_status():
+    """
+    Get SageMaker endpoint status and health information.
+    Returns endpoint status, instance counts, and deployment tracking info.
+    """
+    try:
+        # Describe the SageMaker endpoint
+        response = sagemaker_client.describe_endpoint(EndpointName=SM_ENDPOINT_NAME)
+        
+        endpoint_status = response.get('EndpointStatus', 'Unknown')
+        production_variants = response.get('ProductionVariants', [])
+        
+        # Calculate total instances and current capacity
+        total_instances = 0
+        current_capacity = 0
+        
+        for variant in production_variants:
+            desired_instance_count = variant.get('DesiredInstanceCount', 0)
+            current_instance_count = variant.get('CurrentInstanceCount', 0)            
+            total_instances += desired_instance_count
+            current_capacity += current_instance_count
+        
+        ready = endpoint_status == "InService" and current_capacity > 0
+        # Determine warnings
+        warnings = []
+        if current_capacity == 0:
+            warnings.append("No active instances. Cold start expected.")
+        
+        if endpoint_status != 'InService':
+            warnings.append(f"Endpoint is not in service. Current status: {endpoint_status}")
+        
+        # Build response
+        status_response = {
+            "endpointName": SM_ENDPOINT_NAME,
+            "endpointStatus": endpoint_status,
+            "ready": ready,
+            "currentActiveInstances": current_capacity,
+            "totalDesiredInstances": total_instances,
+            "modelPackageGroup": MODEL_PACKAGE_GROUP,
+            "modelVersion": MODEL_VERSION,
+            "gitCommitIdMLCode": GIT_COMMIT_ID,
+            "warnings": warnings if warnings else None
+        }
+        
+        return {
+            "statusCode": 200,
+            "body": status_response
+        }
+        
+    except Exception as e:
+        print(f"Error getting endpoint status: {e}")
+        print(traceback.format_exc())
+        return {
+            "statusCode": 500,
+            "body": {
+                "error": "Failed to retrieve endpoint status",
+                "message": str(e)
+            }
+        }
 
 
 def get_inference(
@@ -102,7 +166,7 @@ def get_inference(
             # Check if cached results exist
             if 'Items' in response and response['Items']:
                 item = response['Items'][0]
-                existing_version = f"{item.get('modelPackageGroup', "Unknown")}/{item.get('modelVersion', "Unknown")}"
+                existing_version = f"{item.get('modelPackageGroup', 'Unknown')}/{item.get('modelVersion', 'Unknown')}"
                 if existing_version == f"{MODEL_PACKAGE_GROUP}/{MODEL_VERSION}":
                     return process_response(item)
 
@@ -134,6 +198,7 @@ def get_inference(
                 "status": "InProgress",
                 "modelPackageGroup": MODEL_PACKAGE_GROUP,
                 "modelVersion": MODEL_VERSION,
+                "gitCommitIdMLCode": GIT_COMMIT_ID,
                 "result": {
                         "resultS3Url": input_s3_url.replace("/input/", "/result/", 1)
                 }
