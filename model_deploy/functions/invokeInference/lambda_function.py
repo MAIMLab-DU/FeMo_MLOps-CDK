@@ -18,9 +18,9 @@ if not TABLE_NAME:
 if not RESULTS_BUCKET:
     raise ValueError("Environment variable 'INFERENCE_RESULTS_BUCKET' must be set.")
 if not SUCCESS_TOPIC_ARN:
-    raise ValueError("Environment variable 'SUCCESS_TOPIC_ARN' must be set.")
+    raise ValueError("Environment variable 'ASYNC_SUCCESS_TOPIC_ARN' must be set.")
 if not FAILURE_TOPIC_ARN:
-    raise ValueError("Environment variable 'FAILURE_TOPIC_ARN' must be set.")
+    raise ValueError("Environment variable 'ASYNC_ERROR_TOPIC_ARN' must be set.")
 if not SM_ENDPOINT_NAME:
     raise ValueError("Environment variable 'SAGEMAKER_ENDPOINT_NAME' must be set.")
 
@@ -114,9 +114,10 @@ def handle_sns_event(event, context):
 def handle_api_gateway_event(event, context):
     """Handle API Gateway HTTP requests."""
     print("Processing API Gateway event")    
-    from api_handler import get_inference
     
     method = event.get("httpMethod")
+    path = event.get("path", "")
+    
     if not method:
         return {
             "statusCode": 400,
@@ -124,13 +125,19 @@ def handle_api_gateway_event(event, context):
             "body": json.dumps({"message": "Invalid request: Missing httpMethod."}),
         }
 
-    # Delegate method-specific logic to `get_inference`
-    response = get_inference(
-        request_id=context.aws_request_id,
-        method=method,
-        body=json.loads(event["body"]) if "body" in event and event["body"] else None,
-        query_params=event.get("queryStringParameters", {})
-    )
+    # Route to status endpoint
+    if path == "/status" and method == "GET":
+        from api_handler import get_endpoint_status
+        response = get_endpoint_status()
+    else:
+        # Route to inference endpoint
+        from api_handler import get_inference
+        response = get_inference(
+            request_id=context.aws_request_id,
+            method=method,
+            body=json.loads(event["body"]) if "body" in event and event["body"] else None,
+            query_params=event.get("queryStringParameters", {})
+        )
     
     # To ensure body is returned as JSON in response
     body = response.get("body", {})

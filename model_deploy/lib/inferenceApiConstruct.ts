@@ -115,7 +115,7 @@ export class InferenceApiConstruct extends Construct {
         inferenceApiFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
-                Action: ['sagemaker:InvokeEndpoint'],
+                Action: ['sagemaker:InvokeEndpoint', 'sagemaker:DescribeEndpoint'],
                 Resource: [props.sageMakeEndpointArn],
             })
         );
@@ -207,6 +207,25 @@ export class InferenceApiConstruct extends Construct {
                 },
                 {
                     statusCode: '400',
+                    responseModels: {
+                        'application/json': apigateway.Model.ERROR_MODEL,
+                    },
+                },
+            ],
+        });
+
+        // Add /status endpoint for monitoring endpoint health
+        const statusEndpoint = this.api.root.addResource('status');
+        statusEndpoint.addMethod('GET', inferenceIntegration, {
+            methodResponses: [
+                {
+                    statusCode: '200',
+                    responseModels: {
+                        'application/json': apigateway.Model.EMPTY_MODEL,
+                    },
+                },
+                {
+                    statusCode: '500',
                     responseModels: {
                         'application/json': apigateway.Model.ERROR_MODEL,
                     },
