@@ -41,7 +41,6 @@ export class InferenceApiConstruct extends Construct {
             properties: {
                 s3Key: {
                     type: apigateway.JsonSchemaType.STRING,
-                    pattern: '^s3://.*\\.dat$', // Regex for s3Key validation
                 },
             },
             required: ['s3Key'], // Specify required properties
@@ -117,6 +116,15 @@ export class InferenceApiConstruct extends Construct {
                 Effect: 'Allow',
                 Action: ['sagemaker:InvokeEndpoint', 'sagemaker:InvokeEndpointAsync', 'sagemaker:DescribeEndpoint'],
                 Resource: [props.sageMakeEndpointArn],
+            })
+        );
+
+        // Add comprehensive S3 permissions for file existence checks
+        inferenceApiFunctionRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: ['s3:HeadObject', 's3:GetObject', 's3:ListBucket'],
+                Resource: ['arn:aws:s3:::*/*', 'arn:aws:s3:::*'],
             })
         );
 
