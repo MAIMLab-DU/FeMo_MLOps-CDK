@@ -119,6 +119,15 @@ export class InferenceApiConstruct extends Construct {
             })
         );
 
+        // Add permission to check S3 file existence (HeadObject) for any bucket
+        inferenceApiFunctionRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: ['s3:HeadObject'],
+                Resource: ['*'],
+            })
+        );
+
         inferenceApiFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
