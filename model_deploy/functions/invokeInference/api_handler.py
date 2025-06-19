@@ -173,6 +173,16 @@ def get_inference(
                     return process_response(item)
 
             # If no cached results, invoke SageMaker endpoint
+            # First, check if s3Key file exists in S3
+            try:
+                bucket_name, object_key = extract_s3_details(data.s3Key)
+                s3_client.head_object(Bucket=bucket_name, Key=object_key)
+            except Exception:
+                return {
+                    "statusCode": 404,
+                    "body": {"message": f"S3 file not found: {data.s3Key}"}
+                }
+
             payload = asdict(data)
             payload['jobId'] = request_id  # Keep original request_id for DynamoDB
             payload['requestTime'] = datetime.utcnow().isoformat() + 'Z'            

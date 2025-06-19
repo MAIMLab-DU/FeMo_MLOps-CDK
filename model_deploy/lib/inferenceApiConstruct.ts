@@ -41,7 +41,6 @@ export class InferenceApiConstruct extends Construct {
             properties: {
                 s3Key: {
                     type: apigateway.JsonSchemaType.STRING,
-                    pattern: '^s3://.*\\.dat$', // Regex for s3Key validation
                 },
             },
             required: ['s3Key'], // Specify required properties
