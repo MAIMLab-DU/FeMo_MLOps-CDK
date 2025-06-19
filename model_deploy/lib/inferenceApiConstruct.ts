@@ -119,6 +119,15 @@ export class InferenceApiConstruct extends Construct {
             })
         );
 
+        // Add comprehensive S3 permissions for file existence checks
+        inferenceApiFunctionRole.addToPolicy(
+            iam.PolicyStatement.fromJson({
+                Effect: 'Allow',
+                Action: ['s3:HeadObject', 's3:GetObject', 's3:ListBucket'],
+                Resource: ['arn:aws:s3:::*/*', 'arn:aws:s3:::*'],
+            })
+        );
+
         inferenceApiFunctionRole.addToPolicy(
             iam.PolicyStatement.fromJson({
                 Effect: 'Allow',
