@@ -390,7 +390,11 @@ export class CodePipelineConstruct extends Construct {
 
         deployRole.addToPolicy(
             new iam.PolicyStatement({
-                actions: ['codepipeline:ListPipelineExecutions', 'codepipeline:GetPipelineExecution', 'codepipeline:ListActionExecutions'],
+                actions: [
+                    'codepipeline:ListPipelineExecutions',
+                    'codepipeline:GetPipelineExecution',
+                    'codepipeline:ListActionExecutions',
+                ],
                 resources: [`arn:aws:codepipeline:${Stack.of(this).region}:${Stack.of(this).account}:*`],
             })
         );
