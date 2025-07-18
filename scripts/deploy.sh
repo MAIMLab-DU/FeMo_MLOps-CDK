@@ -203,6 +203,7 @@ if [[ -n "$execution_id" && "$execution_id" != "None" && "$execution_id" != "nul
     fi
 fi
 
+echo "📄 CODEBUILD_RESOLVED_SOURCE_VERSION: ${CODEBUILD_RESOLVED_SOURCE_VERSION}"
 # Fallback to CodeBuild environment variable if pipeline query fails (CodeBuild only)
 if [[ -z "$git_commit_id" || "$git_commit_id" == "None" || "$git_commit_id" == "null" ]]; then
     if [[ "$codebuild" == true ]]; then
