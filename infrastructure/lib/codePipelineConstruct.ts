@@ -388,6 +388,17 @@ export class CodePipelineConstruct extends Construct {
             })
         );
 
+        deployRole.addToPolicy(
+            new iam.PolicyStatement({
+                actions: [
+                    'codepipeline:ListPipelineExecutions',
+                    'codepipeline:GetPipelineExecution',
+                    'codepipeline:ListActionExecutions',
+                ],
+                resources: [`arn:aws:codepipeline:${Stack.of(this).region}:${Stack.of(this).account}:*`],
+            })
+        );
+
         const deployProject = new codebuild.PipelineProject(this, 'DeployProject', {
             buildSpec: codebuild.BuildSpec.fromSourceFilename('./buildspecs/deploy.yml'),
             role: deployRole,
