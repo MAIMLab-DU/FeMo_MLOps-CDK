@@ -42,6 +42,10 @@ export class InferenceApiConstruct extends Construct {
                 s3Key: {
                     type: apigateway.JsonSchemaType.STRING,
                 },
+                retryOnFailure: {
+                    type: apigateway.JsonSchemaType.BOOLEAN,
+                    default: false,
+                },
             },
             required: ['s3Key'], // Specify required properties
             additionalProperties: false,

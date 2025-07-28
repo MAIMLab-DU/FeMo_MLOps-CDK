@@ -24,6 +24,7 @@ from utils import (
 @dataclass
 class RequestData:
     s3Key: str
+    retryOnFailure: Optional[bool] = False
 
     def __post_init__(self):
         """
@@ -32,6 +33,8 @@ class RequestData:
         # Validate field types
         if not isinstance(self.s3Key, str):
             raise ValueError(f"'s3Key' must be a string, got {type(self.s3Key).__name__}")
+        if self.retryOnFailure is not None and not isinstance(self.retryOnFailure, bool):
+            raise ValueError(f"'retryOnFailure' must be a boolean, got {type(self.retryOnFailure).__name__}")
 
 
 # Initialize SageMaker runtime client and SageMaker client
@@ -169,7 +172,9 @@ def get_inference(
             if 'Items' in response and response['Items']:
                 item = response['Items'][0]
                 existing_version = f"{item.get('modelPackageGroup', 'Unknown')}/{item.get('modelVersion', 'Unknown')}"
-                if existing_version == f"{MODEL_PACKAGE_GROUP}/{MODEL_VERSION}":
+                retry_on_failure = data.retryOnFailure and item.get('status', 'Unknown') == "Failed"
+                if existing_version == f"{MODEL_PACKAGE_GROUP}/{MODEL_VERSION}" and not retry_on_failure:
+                    print(f"Using cached result for s3Key: {data.s3Key}")
                     return process_response(item)
 
             # If no cached results, invoke SageMaker endpoint
@@ -212,7 +217,7 @@ def get_inference(
                 "modelVersion": MODEL_VERSION,
                 "gitCommitIdMLCode": GIT_COMMIT_ID,
                 "result": {
-                        "resultS3Url": input_s3_url.replace("/input/", "/result/", 1)
+                    "resultS3Url": input_s3_url.replace("/input/", "/result/", 1)
                 }
             }            
             update_item_in_dynamodb(
